@@ -10,8 +10,8 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const ACCENT = '#000000';
 
 const config: CapacitorConfig = {
-  appId: 'com.ionsportsbiz.convidados',
-  appName: 'ion Convidados',
+  appId: 'com.ionsportsbiz.app',
+  appName: 'ion',
   webDir: 'dist',
   // Cor por trás da WebView enquanto a página carrega (igual ao ecrã inicial).
   backgroundColor: ACCENT,

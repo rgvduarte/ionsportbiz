@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["TEAMID.com.ionsportsbiz.convidados"],
+        "appIDs": ["TEAMID.com.ionsportsbiz.app"],
         "components": [
           { "/": "/c/*", "comment": "Convite pessoal: abre na app, se estiver instalada." },
           { "/": "/admin", "comment": "Link de acesso da equipa (convite ou link por email)." },

@@ -1,4 +1,4 @@
-import { createBrowserRouter, createHashRouter, Link, Navigate, type RouteObject } from 'react-router';
+import { createBrowserRouter, createHashRouter, Link, type RouteObject } from 'react-router';
 import { Mail } from 'lucide-react';
 import { RequireStaff, RoleGate } from './guards';
 import { useAuth } from './AuthProvider';
@@ -39,7 +39,7 @@ function NotFound() {
         {!loading && (
           <div className="ui-standalone__actions">
             {staff || isNative
-              ? <ButtonLink to="/" variant="primary">Voltar ao início</ButtonLink>
+              ? <ButtonLink to={staff ? '/admin' : '/'} variant="primary">Voltar ao início</ButtonLink>
               : <Link to="/entrar" className="ui-standalone__link">Acesso da equipa</Link>}
           </div>
         )}
@@ -49,7 +49,6 @@ function NotFound() {
 }
 
 const routes: RouteObject[] = [
-  { path: '/', element: <Navigate to={isNative ? '/app' : '/admin'} replace /> },
   { path: '/entrar', ...page(async () => (await import('../admin/LoginPage')).LoginPage) },
   { path: '/c/:token', ...page(async () => (await import('../guest/GuestInvitationPage')).GuestInvitationPage) },
   { path: '/app', ...page(async () => (await import('../guest/NativeHomePage')).NativeHomePage) },
@@ -78,9 +77,11 @@ const routes: RouteObject[] = [
       },
       { path: 'check-in', ...page(async () => (await import('../admin/checkin/CheckinPage')).CheckinPage, DOOR) },
       { path: 'equipa', ...page(async () => (await import('../admin/team/TeamPage')).TeamPage, ADMIN) },
+      { path: '*', Component: NotFound },
     ],
   },
-  { path: '*', Component: NotFound },
+  // App do evento (participantes): início, agenda, oradores, credencial, networking, notícias.
+  { path: '/*', ...page(async () => (await import('../event/EventApp')).EventApp) },
 ];
 
 // VITE_ROUTER=hash: rotas depois de "#", para alojamentos sem reescrita de rotas (ex.: demonstração no GitHub Pages).

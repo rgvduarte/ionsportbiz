@@ -1,10 +1,13 @@
-# ion Convidados
+# ion
 
-Plataforma de convidados da **ion — International Business & Sports Conference**. Gestão de convidados para eventos por convite: CRM de contactos, listas de convidados por evento, envio de convites (email e WhatsApp), página pessoal do convidado com confirmação de presença e bilhete QR, check-in à porta e apps iOS/Android.
+App e back-office da **ion — International Business & Sports Conference** (PT ’27, 22–23 de março de 2027), em https://ionsportbiz.app.
 
-**Demonstração:** https://convites.ionsportbiz.app (dados fictícios; entrar com `admin@demo.pt` e qualquer palavra-passe).
+- **App do evento** (`/`): início, agenda, oradores, credencial QR, networking com reuniões 1:1, parceiros e notícias. Veio do repositório [rgvduarte/ionAPP](https://github.com/rgvduarte/ionAPP) e vive em `src/event/`.
+- **Back-office** (`/admin`): CRM de contactos, convidados por evento, envio de convites (email e WhatsApp), programa, check-in à porta e equipa.
+- **Convite pessoal** (`/c/<token>`): confirmação de presença, acompanhantes, consentimento e bilhete.
+- **Apps iOS e Android** (Capacitor) a partir do mesmo código.
 
-**Domínios:** `ionsportbiz.app` é a app do evento ([rgvduarte/ionAPP](https://github.com/rgvduarte/ionAPP): agenda, oradores, networking, credencial). `convites.ionsportbiz.app` é esta plataforma: back-office, links pessoais dos convidados e check-in.
+**Demonstração:** dados fictícios guardados só no browser. Back-office em `/#/admin`, entrar com `admin@demo.pt` e qualquer palavra-passe.
 
 ## Como funciona
 
@@ -53,7 +56,7 @@ Outros papéis: `editor@demo.pt`, `porta@demo.pt` (receção), `leitura@demo.pt`
    ```bash
    supabase functions deploy send-invitations
    supabase functions deploy invite-staff
-   supabase secrets set PUBLIC_URL=https://convites.ionsportbiz.app \
+   supabase secrets set PUBLIC_URL=https://ionsportbiz.app \
      BREVO_API_KEY=… MAIL_FROM_EMAIL=convites@exemplo.pt MAIL_FROM_NAME="Nome da entidade"
    ```
 

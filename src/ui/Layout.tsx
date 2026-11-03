@@ -2,10 +2,10 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { ChevronLeft } from 'lucide-react';
 
-const APP_NAME = 'ion Convidados';
+const APP_NAME = 'ion Back-office';
 
 /**
- * Título do separador do browser ("Contactos · ion Convidados"), também anunciado pelos leitores de ecrã.
+ * Título do separador do browser ("Contactos · ion Back-office"), também anunciado pelos leitores de ecrã.
  * Repete-se a cada mudança de rota: o AdminLayout põe o nome da secção antes e a página acerta depois.
  */
 export function useDocumentTitle(title: string | null | undefined): void {

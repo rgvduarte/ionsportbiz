@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">ion Convidados</string>
-    <string name="title_activity_main">ion Convidados</string>
-    <string name="package_name">com.ionsportsbiz.convidados</string>
-    <string name="custom_url_scheme">com.ionsportsbiz.convidados</string>
+    <string name="app_name">ion</string>
+    <string name="title_activity_main">ion</string>
+    <string name="package_name">com.ionsportsbiz.app</string>
+    <string name="custom_url_scheme">com.ionsportsbiz.app</string>
 </resources>

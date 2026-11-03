@@ -1,4 +1,4 @@
-package com.ionsportsbiz.convidados;
+package com.ionsportsbiz.app;
 
 import com.getcapacitor.BridgeActivity;
 

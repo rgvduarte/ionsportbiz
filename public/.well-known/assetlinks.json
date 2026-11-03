@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.ionsportsbiz.convidados",
+      "package_name": "com.ionsportsbiz.app",
       "sha256_cert_fingerprints": ["SHA256_DO_CERTIFICADO_DE_ASSINATURA_DA_APP_NO_GOOGLE_PLAY"]
     }
   }

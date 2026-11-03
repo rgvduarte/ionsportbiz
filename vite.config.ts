@@ -1,10 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+import pkg from './package.json' with { type: 'json' };
 
 export default defineConfig({
   base: process.env.VITE_BASE || '/',
   plugins: [react()],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     alias: { '@shared': fileURLToPath(new URL('./supabase/functions/_shared', import.meta.url)) },
   },

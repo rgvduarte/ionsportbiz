@@ -40,18 +40,18 @@ No browser o check-in também funciona (câmara através da página, em https), 
 
 ## Identificador da app
 
-O identificador é `com.ionsportsbiz.convidados` (domínio invertido de ionsportsbiz.com). **Depois do primeiro envio para as lojas não pode ser alterado**: uma app com outro identificador é, para as lojas, uma app diferente.
+O identificador é `com.ionsportsbiz.app` (domínio invertido de ionsportsbiz.com). **Depois do primeiro envio para as lojas não pode ser alterado**: uma app com outro identificador é, para as lojas, uma app diferente.
 
 Se for preciso mudá-lo antes do primeiro envio, os locais são:
 
 1. `capacitor.config.ts` → `appId`.
 2. `android/app/build.gradle` → `namespace` e `applicationId`.
 3. `android/app/src/main/res/values/strings.xml` → `package_name` e `custom_url_scheme`.
-4. `android/app/src/main/java/com/ionsportsbiz/convidados/MainActivity.java` → mover para a pasta do novo pacote e corrigir a linha `package`.
+4. `android/app/src/main/java/com/ionsportsbiz/app/MainActivity.java` → mover para a pasta do novo pacote e corrigir a linha `package`.
 5. Xcode → alvo **App** → *Signing & Capabilities* → *Bundle Identifier* (fica em `ios/App/App.xcodeproj/project.pbxproj`, `PRODUCT_BUNDLE_IDENTIFIER`).
 6. `public/.well-known/apple-app-site-association` (`appIDs`) e `public/.well-known/assetlinks.json` (`package_name`).
 
-O nome visível (`ion Convidados`) muda em `capacitor.config.ts` (`appName`), em `android/app/src/main/res/values/strings.xml` (`app_name`, `title_activity_main`) e em `ios/App/App/Info.plist` (`CFBundleDisplayName`).
+O nome visível (`ion`) muda em `capacitor.config.ts` (`appName`), em `android/app/src/main/res/values/strings.xml` (`app_name`, `title_activity_main`) e em `ios/App/App/Info.plist` (`CFBundleDisplayName`).
 
 ## Construir as apps
 
@@ -90,9 +90,9 @@ Durante o desenvolvimento, para testar no telemóvel com recarregamento automát
 
 Com isto, o link pessoal `https://<domínio>/c/<token>` enviado por email ou WhatsApp abre diretamente na app, se estiver instalada (senão abre no browser, como sempre). O mesmo acontece com os links `https://<domínio>/admin…`.
 
-1. O domínio é `convites.ionsportbiz.app`, já configurado em:
+1. O domínio é `ionsportbiz.app`, já configurado em:
    - `android/app/src/main/AndroidManifest.xml` (filtro com `android:autoVerify="true"`);
-   - `ios/App/App/App.entitlements` (`applinks:convites.ionsportbiz.app`).
+   - `ios/App/App/App.entitlements` (`applinks:ionsportbiz.app`).
 2. Preencher os modelos em `public/.well-known/` (são publicados com o site):
    - `apple-app-site-association`: substituir `TEAMID` pelo *Team ID* da Apple (10 caracteres, em *developer.apple.com → Membership*), seguido de um ponto e do identificador da app.
    - `assetlinks.json`: substituir o texto `SHA256_…` pela impressão digital SHA-256 do **certificado de assinatura da app** (Play Console → *Configuração → Integridade da app → Assinatura de apps*). Para testar builds locais, acrescentar também a da chave de envio.

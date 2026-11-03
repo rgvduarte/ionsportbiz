@@ -51,7 +51,7 @@ export function AdminLayout() {
   useLayoutEffect(() => {
     const path = location.pathname.replace(/\/+$/, '');
     const section = [...SECTIONS].reverse().find((s) => path === s.to || (!s.end && path.startsWith(`${s.to}/`)));
-    document.title = section ? `${section.label} · ion Convidados` : 'ion Convidados';
+    document.title = section ? `${section.label} · ion Back-office` : 'ion Back-office';
   }, [location.pathname]);
 
   const onReset = async () => {
@@ -66,7 +66,7 @@ export function AdminLayout() {
       <aside id="adm-sidebar" className={['adm-sidebar', open && 'open'].filter(Boolean).join(' ')} aria-label="Navegação principal">
         <div className="adm-brand">
           <img className="adm-brand__logo" src={ionLogo} alt="ion — International Business & Sports Conference" width={112} height={69} />
-          <span className="adm-brand__product">Convidados</span>
+          <span className="adm-brand__product">Back-office</span>
         </div>
         <nav className="adm-nav">
           {items.map((i) => (
@@ -94,7 +94,7 @@ export function AdminLayout() {
           <Button ref={menuButton} variant="ghost" iconOnly aria-label="Abrir menu" aria-expanded={open} aria-controls="adm-sidebar"
             icon={<Menu />} onClick={() => setOpen(true)} />
           <img className="adm-topbar__logo" src={ionLogo} alt="ion" width={56} height={34} />
-          <span className="adm-topbar__title">Convidados</span>
+          <span className="adm-topbar__title">Back-office</span>
         </header>
         {api.mode === 'demo' && (
           <div className="adm-demo" role="note">
