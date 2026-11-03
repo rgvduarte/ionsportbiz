@@ -58,7 +58,7 @@
 .tm-matrix td { text-align: center; width: 120px; }
 .tm-yes, .tm-no { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; }
 .tm-yes { background: var(--c-success-soft); color: var(--c-success); }
-.tm-no { color: #b4bcc8; }
+.tm-no { color: var(--c-text-3); }
 .tm-yes svg, .tm-no svg { width: 14px; height: 14px; }
 .tm-note { margin-top: 16px; }
 
@@ -84,7 +84,7 @@
 .tm-picker__card.is-selected { border-color: var(--c-accent); background: var(--c-accent-soft); box-shadow: inset 0 0 0 1px var(--c-accent); }
 .tm-picker__icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--c-surface-3); color: var(--c-text-2); flex: none; }
 .tm-picker__icon svg { width: 16px; height: 16px; }
-.tm-picker__card.is-selected .tm-picker__icon { background: var(--c-accent); color: #fff; }
+.tm-picker__card.is-selected .tm-picker__icon { background: var(--c-accent); color: var(--c-text-inverse); }
 .tm-picker__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .tm-picker__name { font-weight: 600; }
 .tm-picker__desc { font-size: var(--text-sm); color: var(--c-text-3); line-height: 1.4; }

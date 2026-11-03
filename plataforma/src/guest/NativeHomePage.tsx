@@ -14,6 +14,8 @@ import { LanguageToggle } from './LanguageToggle';
 import { accentStyle } from './parts';
 import { capitalize, eventIsPast, parseInvitationInput } from './utils';
 import './guest.css';
+import { useLightTheme } from './useLightTheme';
+import ionLogo from '../assets/brand/ion-logo.png';
 
 interface Scanner {
   scanQr(): Promise<string | null>;
@@ -41,6 +43,8 @@ const STATUS_TONE: Record<GuestStatusKey, Tone> = {
 
 /** "Os meus convites" (/app): os convites guardados na app, com o estado atual de cada um. */
 export function NativeHomePage() {
+  // A app tem a identidade da ion: tema escuro.
+  useLightTheme(false);
   const [lang, setLang] = useState<Language>(deviceLanguage);
   const t = guestStrings(lang);
   const navigate = useNavigate();
@@ -105,13 +109,12 @@ export function NativeHomePage() {
 
   return (
     <GuestI18n.Provider value={t}>
-      <div className="gn" style={accentStyle(null)} lang={t.htmlLang}>
+      <div className="gn" data-theme="dark" style={accentStyle(null, 'dark')} lang={t.htmlLang}>
         <header className="gn-head">
           <div className="gn-head__inner">
             <div className="gn-head__bar">
               <span className="gn-brand">
-                <span className="gn-brand__mark" aria-hidden><Mail /></span>
-                Convites
+                <img className="gn-brand__logo" src={ionLogo} alt="ion — International Business & Sports Conference" width={72} height={44} />
               </span>
               <LanguageToggle value={lang} onChange={setLang} />
             </div>

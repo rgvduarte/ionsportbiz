@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
-import { Mail } from 'lucide-react';
 import './admin.css';
+import ionLogo from '../assets/brand/ion-logo.png';
 import { useAuth } from '../app/AuthProvider';
 import { api, errorMessage } from '../lib/api';
 import { Alert, Button, Field, Input, useDocumentTitle } from '../ui';
@@ -56,11 +56,8 @@ export function LoginPage() {
     <div className="login">
       <aside className="login__aside">
         <div>
-          <div className="adm-brand" style={{ padding: 0, marginBottom: 48 }}>
-            <span className="adm-brand__mark"><Mail aria-hidden /></span>
-            <span>Convites</span>
-          </div>
-          <h1>Gestão de convidados e eventos institucionais</h1>
+          <img className="login__logo" src={ionLogo} alt="ion — International Business & Sports Conference" width={200} height={123} />
+          <h1>Gestão de convidados</h1>
           <p>Lista de convidados, envio de convites, confirmações e receção no dia do evento, num só lugar.</p>
         </div>
         <p className="login__foot" style={{ fontSize: 'var(--text-sm)' }}>Acesso reservado à equipa organizadora.</p>

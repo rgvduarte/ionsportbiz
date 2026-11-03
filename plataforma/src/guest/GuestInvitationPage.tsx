@@ -16,6 +16,7 @@ import { ProgrammeSection } from './ProgrammeSection';
 import { RsvpSection } from './RsvpSection';
 import { TicketSection } from './TicketSection';
 import './guest.css';
+import { useLightTheme } from './useLightTheme';
 
 /** Convite pessoal (/c/:token). Sem conta: o token do link é a credencial. */
 export function GuestInvitationPage() {
@@ -32,7 +33,9 @@ export function GuestInvitationPage() {
   const lang = chosenLang ?? 'pt';
   const t = guestStrings(lang);
   const accent = view?.event.branding?.accent;
-  const style = useMemo(() => accentStyle(accent), [accent]);
+  const theme = view?.event.branding?.theme === 'dark' ? 'dark' : 'light';
+  const style = useMemo(() => accentStyle(accent, theme), [accent, theme]);
+  useLightTheme(theme === 'light');
 
   // Língua e título do documento, repostos ao sair.
   useEffect(() => {
@@ -42,7 +45,7 @@ export function GuestInvitationPage() {
   }, [t.htmlLang]);
 
   // A barra do browser no telemóvel acompanha a cor do evento.
-  const themeColor = (style as Record<string, string>)['--gi-accent'];
+  const themeColor = theme === 'dark' ? '#000000' : (style as Record<string, string>)['--gi-accent'];
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!meta) return;
@@ -102,7 +105,7 @@ export function GuestInvitationPage() {
 
   return (
     <GuestI18n.Provider value={t}>
-      <div className="gi" style={style} lang={t.htmlLang}>
+      <div className="gi" data-theme={theme} style={style} lang={t.htmlLang}>
         {preview && (
           <div className="gi-preview" role="note">
             <Eye aria-hidden />

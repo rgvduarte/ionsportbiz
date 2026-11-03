@@ -68,10 +68,18 @@ describe('calendarUid', () => {
 });
 
 describe('accentPalette', () => {
-  it('usa o azul institucional para valores inválidos', () => {
-    expect(accentPalette(undefined).accent).toBe('#13294b');
-    expect(accentPalette('red; background: url(x)').accent).toBe('#13294b');
-    expect(accentPalette('#12345').accent).toBe('#13294b');
+  it('usa o verde-lima da ion para valores inválidos', () => {
+    expect(accentPalette(undefined).accent).toBe('#ccff00');
+    expect(accentPalette('red; background: url(x)').accent).toBe('#ccff00');
+    expect(accentPalette('#12345').accent).toBe('#ccff00');
+  });
+
+  it('tema escuro: texto do acento legível sobre preto e texto preto sobre o acento claro', () => {
+    const p = accentPalette('#ccff00', 'dark');
+    expect(p.text).toBe('#ccff00');
+    expect(p.on).toBe('#000000');
+    const navy = accentPalette('#13294b', 'dark');
+    expect(contrast(navy.text, '#0b0b0b')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('aceita #rgb e #rrggbb e calcula derivados', () => {

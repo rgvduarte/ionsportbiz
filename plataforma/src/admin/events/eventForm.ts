@@ -5,7 +5,7 @@ import { fromLocalInput, toLocalInput } from '../../lib/format';
 import { fieldKey, isValidSlug, SLUG_MAX, slugify } from '../../lib/slug';
 
 export const DEFAULT_TIMEZONE = 'Europe/Lisbon';
-export const DEFAULT_ACCENT = '#13294b';
+export const DEFAULT_ACCENT = '#ccff00';
 
 export const TIMEZONES: { value: string; label: string }[] = [
   { value: 'Europe/Lisbon', label: 'Lisboa — Portugal continental' },
@@ -73,6 +73,8 @@ export interface EventFormValues {
   fields: FieldDraft[];
   accent: string;
   logo_url: string;
+  /** Fundo da página do convidado. */
+  theme: 'light' | 'dark';
   privacy_controller: string;
   privacy_policy_url: string;
   marketing_consent_text: string;
@@ -119,6 +121,7 @@ export function toFormValues(event?: EventRecord | null): EventFormValues {
     })),
     accent: event?.branding?.accent || DEFAULT_ACCENT,
     logo_url: event?.branding?.logo_url ?? '',
+    theme: event?.branding?.theme === 'dark' ? 'dark' : 'light',
     privacy_controller: event?.privacy_controller ?? '',
     privacy_policy_url: event?.privacy_policy_url ?? '',
     marketing_consent_text: event?.marketing_consent_text ?? '',
@@ -196,7 +199,7 @@ export function validateEvent(v: EventFormValues): FormErrors {
   for (const k of ['venue_maps_url', 'logo_url', 'privacy_policy_url'] as const) {
     if (v[k].trim() && !isHttpUrl(v[k].trim())) e[k] = 'Indique um endereço completo, a começar por https://';
   }
-  if (!isHexColor(v.accent)) e.accent = 'Use o formato #RRGGBB, por exemplo #13294B.';
+  if (!isHexColor(v.accent)) e.accent = 'Use o formato #RRGGBB, por exemplo #CCFF00.';
 
   for (const f of v.fields) {
     if (!f.label.trim()) e[`field:${f.uid}:label`] = 'Escreva a pergunta.';
@@ -219,6 +222,8 @@ export function toEventInput(v: EventFormValues, base?: EventRecord | null): Eve
   branding.accent = v.accent.toLowerCase();
   if (v.logo_url.trim()) branding.logo_url = v.logo_url.trim();
   else delete branding.logo_url;
+  if (v.theme === 'dark') branding.theme = 'dark';
+  else delete branding.theme;
   return {
     slug: v.slug,
     name: v.name.trim(),
@@ -320,6 +325,7 @@ export function copyableValues(source: EventRecord): Partial<EventFormValues> {
     fields: v.fields.map((f) => ({ ...f, key: null })),
     accent: v.accent,
     logo_url: v.logo_url,
+    theme: v.theme,
     privacy_controller: v.privacy_controller,
     privacy_policy_url: v.privacy_policy_url,
     marketing_consent_text: v.marketing_consent_text,

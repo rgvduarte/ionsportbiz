@@ -779,3 +779,67 @@
 .gn-add .ui-btn--lg { height: 48px; }
 .gn-add__or { display: flex; align-items: center; gap: 12px; font-size: var(--text-sm); color: var(--gi-ink-3); }
 .gn-add__or::before, .gn-add__or::after { content: ''; flex: 1; height: 1px; background: var(--gi-line); }
+
+/* ───────── Tema escuro (branding.theme = 'dark') ─────────
+   Para marcas como a ion: fundo preto, papel quase preto, malha de pontos no gradiente da marca
+   e títulos em Inter Tight a negrito em vez da serifa. */
+.gi[data-theme='dark'],
+.gn[data-theme='dark'] {
+  --font-serif: var(--font-display);
+  --gi-paper: #0b0b0b;
+  --gi-bg: #000;
+  --gi-ink: #f4f4f4;
+  --gi-ink-2: #c2c2c2;
+  --gi-ink-3: #8e8e8e;
+  --gi-line: #262626;
+  --gi-gold: var(--brand-orange);
+  --gi-gold-text: #ff7a3d;
+  --gi-gold-line: rgba(255, 83, 0, 0.45);
+}
+.gi[data-theme='dark'] .gi-band,
+.gn[data-theme='dark'] .gn-head {
+  background: #000;
+}
+.gi[data-theme='dark'] .gi-band::before,
+.gn[data-theme='dark'] .gn-head::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--brand-gradient);
+  -webkit-mask: radial-gradient(circle, #000 1.5px, transparent 2.1px) 0 0 / 12px 12px, linear-gradient(to bottom, rgba(0, 0, 0, 0.85), transparent 92%);
+  -webkit-mask-composite: source-in;
+  mask: radial-gradient(circle, #000 1.5px, transparent 2.1px) 0 0 / 12px 12px intersect, linear-gradient(to bottom, rgba(0, 0, 0, 0.85), transparent 92%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.gn[data-theme='dark'] .gn-head > * { position: relative; }
+.gi[data-theme='dark'] .gi-band::after { background: var(--brand-gradient); opacity: 0.6; }
+.gi[data-theme='dark'] .gi-top,
+.gn[data-theme='dark'] .gn-head { color: var(--gi-ink); }
+.gi[data-theme='dark'] .gi-lang__btn[aria-pressed='true'] { background: var(--gi-accent); color: var(--gi-on-accent); }
+.gi[data-theme='dark'] .gi-lang__btn:focus-visible { box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--gi-accent); }
+.gi[data-theme='dark'] .gi-card { box-shadow: 0 0 0 1px var(--gi-line), 0 30px 80px -30px rgba(204, 255, 0, 0.18); }
+.gi[data-theme='dark'] .gi-card__name,
+.gi[data-theme='dark'] .gi-section__title,
+.gi[data-theme='dark'] .gi-form__title,
+.gi[data-theme='dark'] .gi-done__title,
+.gi[data-theme='dark'] .gi-ticket__event,
+.gi[data-theme='dark'] .gi-programme__title,
+.gi[data-theme='dark'] .gi-state__title,
+.gn[data-theme='dark'] .gn-head__title,
+.gn[data-theme='dark'] .gn-item__name { font-weight: 700; letter-spacing: -0.03em; }
+.gi[data-theme='dark'] .gi-card__name { color: var(--gi-accent); }
+.gi[data-theme='dark'] .gi-skel { background: linear-gradient(90deg, #161616, #222, #161616); background-size: 200% 100%; }
+.gi[data-theme='dark'] .gi-preview { border-bottom-color: color-mix(in srgb, var(--c-warning) 40%, transparent); color: var(--c-warning); }
+.gi[data-theme='dark'] .gi-form__preview { color: var(--gi-gold-text); }
+.gi[data-theme='dark'] .gi-choice__btn:hover,
+.gi[data-theme='dark'] .gi-choice:has([aria-pressed='true']) .gi-choice__btn[aria-pressed='false']:hover { border-color: #4a4a4a; }
+.gi[data-theme='dark'] .gi-ticket { background: #0b0b0b; box-shadow: 0 0 0 1px var(--gi-line); }
+.gi[data-theme='dark'] .gi-ticket__head { background: var(--brand-gradient); color: #000; }
+.gi[data-theme='dark'] .gi-ticket__tear::before,
+.gi[data-theme='dark'] .gi-ticket__tear::after { background: var(--c-surface); }
+.gi[data-theme='dark'] .gi-footer__done { color: var(--c-success); }
+.gn[data-theme='dark'] .gn-brand__mark { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); color: var(--gi-accent); }
+.gn[data-theme='dark'] .gn-item:hover { border-color: #3a3a3a; }
+.gn[data-theme='dark'] .gn-brand__logo { width: 72px; height: auto; }
+.gi[data-theme='dark'] .gi-card * { font-style: normal; }

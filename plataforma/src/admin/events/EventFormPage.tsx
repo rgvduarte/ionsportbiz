@@ -60,7 +60,7 @@ const SECTIONS: { id: string; title: string; keys: string[] }[] = [
   { id: 'evf-data-local', title: 'Data e local', keys: ['starts_at', 'ends_at', 'timezone', 'rsvp_deadline', 'venue_name', 'venue_address', 'venue_maps_url', 'dress_code'] },
   { id: 'evf-convidados', title: 'Convidados e contacto', keys: ['capacity', 'default_plus_ones', 'contact_email', 'contact_phone'] },
   { id: 'evf-formulario', title: 'Formulário de resposta', keys: ['field:'] },
-  { id: 'evf-imagem', title: 'Imagem', keys: ['accent', 'logo_url'] },
+  { id: 'evf-imagem', title: 'Imagem', keys: ['accent', 'logo_url', 'theme'] },
   { id: 'evf-privacidade', title: 'Privacidade (RGPD)', keys: ['privacy_controller', 'privacy_policy_url', 'marketing_consent_text'] },
   { id: 'evf-estado', title: 'Estado', keys: ['status'] },
 ];
@@ -229,7 +229,11 @@ function EventForm({ event, onSaved }: { event: EventRecord | null; onSaved?: (e
     el.querySelector<HTMLElement>('h2 > [tabindex="-1"]')?.focus({ preventScroll: true });
   };
 
-  const accentStyle = { '--evf-accent': isHexColor(values.accent) ? values.accent : DEFAULT_ACCENT } as CSSProperties;
+  const accentHex = isHexColor(values.accent) ? values.accent : DEFAULT_ACCENT;
+  const accentStyle = {
+    '--evf-accent': accentHex,
+    '--evf-on-accent': contrastWithWhite(accentHex) >= 4.5 ? '#ffffff' : '#000000',
+  } as CSSProperties;
 
   const checklist: [string, boolean][] = [
     ['Nome e data de início', !!values.name.trim() && !!values.starts_at],
@@ -737,7 +741,8 @@ function Branding({ values, update, err }: { values: EventFormValues; update: Up
   const [failed, setFailed] = useState<string | null>(null);
   const logo = values.logo_url.trim();
   const showLogo = isHttpUrl(logo) && failed !== logo;
-  const lowContrast = isHexColor(values.accent) && contrastWithWhite(values.accent) < 4.5;
+  // Sobre fundo claro, uma cor muito clara (ex.: verde-lima) perde legibilidade nos textos e ligações.
+  const lowContrast = values.theme === 'light' && isHexColor(values.accent) && contrastWithWhite(values.accent) < 3;
   const startIso = values.starts_at ? fromLocalInput(values.starts_at, values.timezone) : null;
   return (
     <div className="evf-grid">
@@ -771,14 +776,26 @@ function Branding({ values, update, err }: { values: EventFormValues; update: Up
             ? <div className="ui-field__error" id="evf-accent-hint" role="alert">{err('accent')}</div>
             : <div className="ui-field__hint" id="evf-accent-hint">Usada nos botões e nos detalhes do convite.</div>}
         </div>
-        {lowContrast && <Alert tone="warning">Cor clara: o texto branco dos botões pode ficar pouco legível. Prefira um tom mais escuro.</Alert>}
+        {lowContrast && <Alert tone="warning">Cor muito clara para fundo claro: os textos e ligações perdem legibilidade. Escolha o fundo escuro ou um tom mais escuro.</Alert>}
+        <div className="ui-field" role="radiogroup" aria-labelledby="evf-theme-label">
+          <span className="ui-field__label" id="evf-theme-label">Fundo da página do convidado</span>
+          <div className="ui-row">
+            {([['light', 'Claro'], ['dark', 'Escuro']] as const).map(([value, label]) => (
+              <label key={value} className="ui-check" style={{ marginRight: 16 }}>
+                <input type="radio" name="evf-theme" checked={values.theme === value} onChange={() => update({ theme: value })} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="ui-field__hint">O escuro acompanha marcas com cores vivas e logótipos pensados para fundo preto.</div>
+        </div>
         <Field label="Logótipo" error={err('logo_url')} hint="Endereço de uma imagem PNG ou SVG, de preferência com fundo transparente.">
           <Input value={values.logo_url} onChange={(e) => update({ logo_url: e.target.value })} type="url" inputMode="url" placeholder="https://" />
         </Field>
       </div>
       <div>
         <div className="ui-field__label" style={{ marginBottom: 6 }}>Pré-visualização</div>
-        <div className="evf-brand" aria-hidden>
+        <div className={['evf-brand', values.theme === 'dark' && 'evf-brand--dark'].filter(Boolean).join(' ')} aria-hidden>
           <div className="evf-brand__bar" />
           <div className="evf-brand__body">
             {showLogo ? (

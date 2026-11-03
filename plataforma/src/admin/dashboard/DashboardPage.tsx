@@ -7,9 +7,7 @@ import {
 import './dashboard.css';
 import { api, type Activity, type EventRecord, type EventStats } from '../../lib/api';
 import { useAsync } from '../../lib/useAsync';
-import {
-  formatDate, formatDateTime, formatLongDate, formatNumber, formatPercent, formatRelative, formatShortDate, formatTime, fullName,
-} from '../../lib/format';
+import { formatDate, formatDateTime, formatLongDate, formatNumber, formatPercent, formatRelative, formatShortDate, formatTime, fullName, toLocalInput } from '../../lib/format';
 import { ACTIVITY, EVENT_STATUS, INVITATION_STATUS } from '../../lib/status';
 import { usePermissions } from '../../app/AuthProvider';
 import { Badge, ButtonLink, Card, EmptyState, LoadError, PageHeader, Select, Skeleton, Stat } from '../../ui';
@@ -168,7 +166,9 @@ function Hero({ event }: { event: EventRecord }) {
         <h2 className="dash-hero__name"><Link to={base}>{event.name}</Link></h2>
         <div className="dash-hero__meta">
           <span><CalendarDays aria-hidden />{capitalize(formatLongDate(event.starts_at, tz))}, {formatTime(event.starts_at, tz)}
-            {event.ends_at && `–${formatTime(event.ends_at, tz)}`}</span>
+            {event.ends_at && (toLocalInput(event.ends_at, tz).slice(0, 10) === toLocalInput(event.starts_at, tz).slice(0, 10)
+              ? `–${formatTime(event.ends_at, tz)}`
+              : ` a ${formatLongDate(event.ends_at, tz)}, ${formatTime(event.ends_at, tz)}`)}</span>
           {event.venue_name && <span><MapPin aria-hidden />{event.venue_name}</span>}
         </div>
         <div className="dash-hero__links">

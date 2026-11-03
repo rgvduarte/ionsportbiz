@@ -8,11 +8,11 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // "pt.convites.app" é provisório: tem de ser mudado ANTES do primeiro envio para a App Store / Google Play,
 // porque depois não pode ser alterado. Ao mudar, mudar também nos projetos ios/ e android/ (ver documentação).
 
-const ACCENT = '#13294b';
+const ACCENT = '#000000';
 
 const config: CapacitorConfig = {
   appId: 'pt.convites.app',
-  appName: 'Convites',
+  appName: 'ion Convidados',
   webDir: 'dist',
   // Cor por trás da WebView enquanto a página carrega (igual ao ecrã inicial).
   backgroundColor: ACCENT,

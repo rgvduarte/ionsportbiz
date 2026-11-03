@@ -46,7 +46,7 @@ describe('demo checkin', () => {
     expect(r?.invitation_id).toBe(inv.id);
     expect(r).not.toHaveProperty('email');
     expect(r).not.toHaveProperty('phone');
-    expect(r?.event_name).toBe('Encontro Anual 2027');
+    expect(r?.event_name).toBe('ion Portugal 2027');
     expect((await checkin.lookup(MAIN, `https://convites.exemplo.pt/c/${inv.token}`))?.invitation_id).toBe(inv.id);
     expect(await checkin.lookup(PAST, inv.checkin_code)).toBeNull();
     expect(await checkin.lookup(MAIN, 'ZZZZZZZZZZ')).toBeNull();

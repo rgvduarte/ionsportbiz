@@ -4,7 +4,7 @@ import type { GuestView, RsvpField } from '../lib/api/types';
 import { formatDate, formatLongDate, formatTime } from '../lib/format';
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
-const DEFAULT_ACCENT = '#13294b';
+const DEFAULT_ACCENT = '#ccff00';
 
 function parseHex(hex: string): [number, number, number] {
   let h = hex.slice(1);
@@ -37,18 +37,31 @@ export interface AccentPalette {
   soft: string;
   /** Texto sobre o acento. */
   on: string;
-  /** Acento legível sobre branco (para texto e links). */
+  /** Acento legível sobre o fundo da página (para texto e links). */
   text: string;
 }
 
 /**
- * Paleta a partir da cor da marca do evento. Cores inválidas usam o azul institucional
+ * Paleta a partir da cor da marca do evento. Cores inválidas usam o verde-lima da ion
  * (o valor vem da base de dados e entra em CSS: só se aceitam #rgb ou #rrggbb).
+ * No tema escuro o texto do acento é aclarado até ter contraste sobre o papel preto.
  */
-export function accentPalette(input: string | null | undefined): AccentPalette {
+export function accentPalette(input: string | null | undefined, theme: 'light' | 'dark' = 'light'): AccentPalette {
   const accent = input && HEX.test(input.trim()) ? input.trim().toLowerCase() : DEFAULT_ACCENT;
   const rgb = parseHex(accent);
   const on = contrast(accent, '#ffffff') >= 4.5 ? '#ffffff' : '#101828';
+  if (theme === 'dark') {
+    let text = accent;
+    for (let t = 0.1; contrast(text, '#0b0b0b') < 4.5 && t <= 1; t += 0.1) text = toHex(mix(rgb, [255, 255, 255], t));
+    const light = luminance(rgb) > 0.4;
+    return {
+      accent,
+      strong: toHex(mix(rgb, light ? [0, 0, 0] : [255, 255, 255], 0.14)),
+      soft: toHex(mix(rgb, [11, 11, 11], 0.86)),
+      on: on === '#101828' ? '#000000' : on,
+      text,
+    };
+  }
   // Acentos claros (ex.: amarelo) não se leem como texto sobre branco: escurece até ter contraste.
   let text = accent;
   for (let t = 0.1; contrast(text, '#ffffff') < 4.5 && t <= 1; t += 0.1) text = toHex(mix(rgb, [16, 24, 40], t));

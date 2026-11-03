@@ -5,6 +5,7 @@ import type {
   Activity, Channel, Companion, Contact, EventRecord, EventSession, Invitation, InvitationStatus,
   MessageTemplate, Staff, StaffRole,
 } from '../types';
+import ionLogo from '../../../assets/brand/ion-logo.png';
 import { ApiError } from '../errors';
 
 /** Convite guardado: o link e o código existem sempre; o contrato só os entrega a quem edita. */
@@ -25,7 +26,7 @@ export interface DemoDb {
 }
 
 // Muda quando os dados fictícios mudam, para a demonstração recomeçar com os novos.
-const KEY = 'convites-demo-v2';
+const KEY = 'convites-demo-v3';
 
 // ───────── Utilitários ─────────
 
@@ -236,20 +237,20 @@ function seed(): DemoDb {
   ];
   const admin = staff[0].user_id;
 
-  // Evento principal: daqui a ~2 meses, ao fim da tarde (guardado em UTC).
-  const main = new Date(now + 62 * day);
-  main.setUTCHours(18, 0, 0, 0);
+  // Evento principal: ion Portugal 2027, 22 de março às 19h00 de Lisboa (UTC+0 nessa data).
+  const main = new Date('2027-03-22T19:00:00Z');
   const past = new Date(now - 140 * day);
   past.setUTCHours(17, 30, 0, 0);
 
   const baseEvent = {
     timezone: 'Europe/Lisbon',
-    contact_email: 'eventos@exemplo.pt',
+    contact_email: 'convidados@exemplo.pt',
     contact_phone: '+351210000000',
-    branding: { accent: '#13294b' },
-    privacy_controller: 'Fundação Exemplo, Avenida da Liberdade 100, 1250-000 Lisboa',
+    // O convite mostra o logótipo só a partir de um endereço absoluto (http/https).
+    branding: { accent: '#ccff00', logo_url: typeof window === 'undefined' ? ionLogo : new URL(ionLogo, window.location.href).href, theme: 'dark' },
+    privacy_controller: 'Entidade organizadora da ion (a definir)',
     privacy_policy_url: null,
-    marketing_consent_text: 'Aceito receber convites e comunicações futuras da Fundação Exemplo.',
+    marketing_consent_text: 'Aceito receber convites e comunicações futuras da ion — International Business & Sports Conference.',
     created_at: created,
     updated_at: created,
   } as const;
@@ -258,19 +259,19 @@ function seed(): DemoDb {
     {
       ...baseEvent,
       id: '00000000-0000-4000-8000-0000000000e1',
-      slug: 'encontro-anual-2027',
-      name: 'Encontro Anual 2027',
-      host_name: 'O Conselho de Administração da Fundação Exemplo',
-      invitation_text: 'tem a honra de convidar V. Exa. para o Encontro Anual, seguido de jantar.',
-      description: 'Apresentação do relatório anual, entrega dos Prémios Horizonte e jantar.',
+      slug: 'ion-portugal-2027',
+      name: 'ion Portugal 2027',
+      host_name: 'A organização da ion — International Business & Sports Conference',
+      invitation_text: 'tem a honra de convidar V. Exa. para o VIP Gala Dinner e a cerimónia dos ion Awards, a 22 de março, e para a ion Conference, a 23 de março.',
+      description: 'Dois dias onde o desporto abre a porta aos negócios: jantar de gala e entrega de prémios, seguidos de uma conferência com cinco palcos temáticos e mais de 90 oradores.',
       starts_at: iso(main.getTime()),
-      ends_at: iso(main.getTime() + 5 * 3_600_000),
-      venue_name: 'Palácio do Exemplo',
-      venue_address: 'Rua das Janelas Verdes 1, 1200-000 Lisboa',
-      venue_maps_url: 'https://maps.google.com/?q=Rua+das+Janelas+Verdes+Lisboa',
-      dress_code: 'Black tie',
+      ends_at: iso(main.getTime() + 23 * 3_600_000),
+      venue_name: null, // local ainda por anunciar
+      venue_address: null,
+      venue_maps_url: null,
+      dress_code: 'Black tie (jantar de gala)',
       rsvp_deadline: iso(main.getTime() - 14 * day),
-      capacity: 120,
+      capacity: 650,
       default_plus_ones: 1,
       status: 'open',
       rsvp_fields: [
@@ -282,15 +283,15 @@ function seed(): DemoDb {
     {
       ...baseEvent,
       id: '00000000-0000-4000-8000-0000000000e2',
-      slug: 'conferencia-primavera',
-      name: 'Conferência de Primavera',
-      host_name: 'A Fundação Exemplo',
-      invitation_text: 'convida V. Exa. para a Conferência de Primavera.',
+      slug: 'ion-networking-2026',
+      name: 'ion Networking 2026',
+      host_name: 'A organização da ion',
+      invitation_text: 'convida V. Exa. para o encontro ion Networking.',
       description: null,
       starts_at: iso(past.getTime()),
       ends_at: iso(past.getTime() + 3 * 3_600_000),
-      venue_name: 'Auditório Horizonte',
-      venue_address: 'Avenida da Liberdade 100, 1250-000 Lisboa',
+      venue_name: 'Local do evento',
+      venue_address: null,
       venue_maps_url: null,
       dress_code: null,
       rsvp_deadline: null,
@@ -301,11 +302,15 @@ function seed(): DemoDb {
     },
   ];
 
+  // Minutos a partir do início (22 de março, 19h00).
   const sessions: EventSession[] = [
-    [0, 30, 'Receção e cocktail de boas-vindas', 'Claustro'],
-    [30, 75, 'Abertura e apresentação do Relatório Anual', 'Salão Nobre'],
-    [75, 105, 'Entrega dos Prémios Horizonte', 'Salão Nobre'],
-    [120, 270, 'Jantar', 'Galeria'],
+    [0, 45, 'Receção VIP e cocktail de boas-vindas', 'Foyer'],
+    [60, 210, 'VIP Gala Dinner', 'Sala de gala'],
+    [210, 270, 'Cerimónia dos ion Awards', 'Sala de gala'],
+    [840, 870, 'Acreditação da ion Conference', 'Entrada principal'],
+    [870, 1080, 'ion Conference: sessões da manhã nos cinco palcos temáticos', 'Palcos 1 a 5'],
+    [1080, 1200, 'VIP Lunch', 'Sala VIP'],
+    [1200, 1380, 'ion Conference: sessões da tarde e encerramento', 'Palco principal'],
   ].map(([from, to, title, location], i) => ({
     id: `00000000-0000-4000-8000-0000000005${String(i).padStart(2, '0')}`,
     event_id: events[0].id,

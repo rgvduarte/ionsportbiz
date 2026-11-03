@@ -27,7 +27,7 @@ describe('demo events.stats', () => {
     const accepted = inv.filter((i) => i.status === 'accepted');
     const companions = d.companions.filter((m) => accepted.some((i) => i.id === m.invitation_id)).length;
     expect(s.expected_attendees).toBe(accepted.length + companions);
-    expect(s.capacity).toBe(120);
+    expect(s.capacity).toBe(650);
     expect(s.checked_in).toBe(0);
   });
 
@@ -109,7 +109,7 @@ describe('demo events: permissões e regras', () => {
 
   it('sessões: cria, ordena, edita e apaga', async () => {
     const before = await events.sessions(MAIN);
-    expect(before.length).toBe(4);
+    expect(before.length).toBe(7);
     const start = new Date(new Date(before[0].starts_at).getTime() - 3_600_000).toISOString();
     const created = await events.saveSession({ event_id: MAIN, title: 'Credenciação', starts_at: start, ends_at: null, description: null, location: 'Átrio', speakers: null });
     const after = await events.sessions(MAIN);
@@ -118,7 +118,7 @@ describe('demo events: permissões e regras', () => {
     expect(edited.title).toBe('Credenciação e boas-vindas');
     await expect(events.saveSession({ ...created, ends_at: '2000-01-01T00:00:00.000Z' })).rejects.toMatchObject({ code: 'validation' });
     await events.removeSession(created.id);
-    expect((await events.sessions(MAIN)).length).toBe(4);
+    expect((await events.sessions(MAIN)).length).toBe(7);
     await expect(events.removeSession(created.id)).rejects.toMatchObject({ code: 'not_found' });
   });
 });

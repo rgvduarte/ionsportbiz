@@ -109,7 +109,7 @@
   display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%;
   background: none; color: inherit; cursor: pointer; opacity: 0.7;
 }
-.ct-chip button:hover { opacity: 1; background: rgba(19, 41, 75, 0.1); }
+.ct-chip button:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
 .ct-chip svg { width: 12px; height: 12px; }
 
 .ct-help { font-size: var(--text-sm); color: var(--c-text-3); }
@@ -125,7 +125,7 @@
 .ct-head__role { color: var(--c-text-2); margin-top: 2px; }
 .ct-head__badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ct-head__actions { display: flex; align-items: center; gap: 8px; }
-.ct-head .ui-avatar--lg { width: 64px; height: 64px; font-size: var(--text-xl); background: var(--c-accent); color: #fff; }
+.ct-head .ui-avatar--lg { width: 64px; height: 64px; font-size: var(--text-xl); background: var(--brand-gradient); color: #000; }
 @media (max-width: 560px) {
   .ct-head .ui-avatar--lg { width: 48px; height: 48px; font-size: var(--text-md); }
   .ct-head__name { font-size: var(--text-xl); }
@@ -146,7 +146,7 @@
 .ct-consent__date { font-size: var(--text-sm); color: var(--c-text-3); }
 .ct-quote {
   margin: 0; padding: 10px 12px; border-left: 3px solid var(--c-gold); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: var(--c-gold-soft); color: var(--c-text-2); font-size: var(--text-sm); font-family: var(--font-serif);
+  background: var(--c-gold-soft); color: var(--c-text-2); font-size: var(--text-sm); font-family: var(--font-display);
 }
 
 .ct-composer { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
@@ -182,7 +182,7 @@
 .ct-steps__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ct-steps__text small { display: block; font-weight: 400; color: var(--c-text-3); font-size: var(--text-xs); }
 .ct-steps li[aria-current='step'] { border-color: var(--c-accent); color: var(--c-text); box-shadow: 0 0 0 1px var(--c-accent) inset; }
-.ct-steps li[aria-current='step'] .ct-steps__num { background: var(--c-accent); color: #fff; }
+.ct-steps li[aria-current='step'] .ct-steps__num { background: var(--brand-gradient); color: #000; }
 .ct-steps li.is-done { color: var(--c-text-2); }
 .ct-steps li.is-done .ct-steps__num { background: var(--c-success-soft); color: var(--c-success); }
 @media (max-width: 720px) {

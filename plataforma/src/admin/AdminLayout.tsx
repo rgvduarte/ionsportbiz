@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { CalendarDays, LayoutDashboard, LogOut, Mail, Menu, ScanLine, Users, UserCog } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, Menu, ScanLine, Users, UserCog } from 'lucide-react';
+import ionLogo from '../assets/brand/ion-logo.png';
 import './admin.css';
 import { useAuth } from '../app/AuthProvider';
 import { api } from '../lib/api';
@@ -50,7 +51,7 @@ export function AdminLayout() {
   useLayoutEffect(() => {
     const path = location.pathname.replace(/\/+$/, '');
     const section = [...SECTIONS].reverse().find((s) => path === s.to || (!s.end && path.startsWith(`${s.to}/`)));
-    document.title = section ? `${section.label} · Convites` : 'Convites';
+    document.title = section ? `${section.label} · ion Convidados` : 'ion Convidados';
   }, [location.pathname]);
 
   const onReset = async () => {
@@ -64,8 +65,8 @@ export function AdminLayout() {
     <div className="adm">
       <aside id="adm-sidebar" className={['adm-sidebar', open && 'open'].filter(Boolean).join(' ')} aria-label="Navegação principal">
         <div className="adm-brand">
-          <span className="adm-brand__mark"><Mail aria-hidden /></span>
-          <span>Convites<small>Gestão de convidados</small></span>
+          <img className="adm-brand__logo" src={ionLogo} alt="ion — International Business & Sports Conference" width={112} height={69} />
+          <span className="adm-brand__product">Convidados</span>
         </div>
         <nav className="adm-nav">
           {items.map((i) => (
@@ -92,7 +93,8 @@ export function AdminLayout() {
         <header className="adm-topbar">
           <Button ref={menuButton} variant="ghost" iconOnly aria-label="Abrir menu" aria-expanded={open} aria-controls="adm-sidebar"
             icon={<Menu />} onClick={() => setOpen(true)} />
-          <span className="adm-topbar__title">Convites</span>
+          <img className="adm-topbar__logo" src={ionLogo} alt="ion" width={56} height={34} />
+          <span className="adm-topbar__title">Convidados</span>
         </header>
         {api.mode === 'demo' && (
           <div className="adm-demo" role="note">

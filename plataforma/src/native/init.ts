@@ -1,6 +1,6 @@
 import { isNative, platform } from './platform';
 
-const ACCENT = '#13294b';
+const ACCENT = '#000000';
 
 /** Ecrãs de onde o botão "voltar" do Android sai da app em vez de recuar. */
 const ROOT_PATHS = new Set(['/', '/app', '/admin', '/entrar']);

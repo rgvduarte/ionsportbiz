@@ -35,6 +35,8 @@ export interface RsvpField {
 export interface Branding {
   accent?: string;
   logo_url?: string;
+  /** Fundo da página do convidado: claro (papel, por omissão) ou escuro. */
+  theme?: 'light' | 'dark';
 }
 
 export interface EventRecord {

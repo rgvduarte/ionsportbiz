@@ -58,9 +58,9 @@ export function InvitationSkeleton({ label }: { label: string }) {
   );
 }
 
-/** Variáveis CSS com a cor da marca do evento (ou o azul institucional). */
-export function accentStyle(accent: string | null | undefined): CSSProperties {
-  const p = accentPalette(accent);
+/** Variáveis CSS com a cor da marca do evento (ou o verde-lima da ion). */
+export function accentStyle(accent: string | null | undefined, theme: 'light' | 'dark' = 'light'): CSSProperties {
+  const p = accentPalette(accent, theme);
   return {
     '--gi-accent': p.accent,
     '--gi-accent-strong': p.strong,

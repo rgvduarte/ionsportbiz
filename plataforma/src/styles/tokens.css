@@ -1,8 +1,84 @@
-/* Sistema de design: tokens. Paleta institucional (azul-marinho + dourado discreto), só modo claro. */
+/* Sistema de design: tokens. Identidade do evento ion (International Business & Sports Conference):
+   fundo preto, verde-lima #CCFF00, laranja #FF5300 e o gradiente do logótipo; tipografia Inter Tight. */
 :root {
-  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Inter Tight Variable', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Inter Tight Variable', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --brand-lime: #ccff00;
+  --brand-orange: #ff5300;
+  --brand-gradient: linear-gradient(90deg, #ccff00 0%, #e27a2c 62%, #ea4d3b 100%);
+
+  --c-bg: #000000;
+  --c-surface: #0e0e0e;
+  --c-surface-2: #141414;
+  --c-surface-3: #1d1d1d;
+  --c-border: #262626;
+  --c-border-strong: #3a3a3a;
+  --c-text: #f4f4f4;
+  --c-text-2: #c2c2c2;
+  --c-text-3: #8e8e8e;         /* 5,9:1 sobre --c-surface */
+  --c-text-inverse: #000000;   /* texto sobre o verde-lima */
+  --c-placeholder: #6b6b6b;
+
+  --c-accent: #ccff00;
+  --c-accent-hover: #b8e800;
+  --c-accent-soft: rgba(204, 255, 0, 0.12);
+  --c-accent-text: #ccff00;
+  --c-gold: #ff5300;           /* laranja da marca: filetes, contornos e ícones */
+  --c-gold-text: #ff7a3d;      /* laranja para texto pequeno sobre fundo escuro (AA) */
+  --c-gold-soft: rgba(255, 83, 0, 0.14);
+  --c-gold-light: #ccff00;
+
+  --c-success: #4ade80;
+  --c-success-soft: rgba(74, 222, 128, 0.12);
+  --c-warning: #fbbf24;
+  --c-warning-soft: rgba(251, 191, 36, 0.13);
+  --c-danger: #ff6b5b;
+  --c-danger-soft: rgba(255, 107, 91, 0.13);
+  --c-info: #7aa7ff;
+  --c-info-soft: rgba(122, 167, 255, 0.13);
+  --c-scrim: rgba(0, 0, 0, 0.7);
+
+  /* Foco do teclado: anel verde-lima de 2px separado do elemento (WCAG 2.4.7/2.4.11). */
+  --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
+  --focus-ring-field: 0 0 0 1px var(--c-accent), 0 0 0 4px rgba(204, 255, 0, 0.16);
+  --focus-ring-inverse: 0 0 0 2px var(--c-accent);
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+
+  --sidebar-w: 248px;
+  --topbar-h: 56px;
+  --content-max: 1240px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: dark;
+}
+
+/* Tema claro (página do convidado com papel claro, pré-visualizações de email). */
+.theme-light {
 
   --c-bg: #f5f6f8;
   --c-surface: #ffffff;
@@ -39,34 +115,11 @@
   --focus-ring-field: 0 0 0 1px var(--c-accent), 0 0 0 4px rgba(19, 41, 75, 0.14);
   /* Sobre fundo azul-marinho (barra lateral, barra de topo). */
   --focus-ring-inverse: 0 0 0 2px var(--c-gold-light);
-
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-
+  --c-placeholder: #98a2b3;
+  --c-scrim: rgba(16, 24, 40, 0.45);
   --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
   --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
   --shadow-lg: 0 16px 40px rgba(16, 24, 40, 0.14), 0 4px 8px rgba(16, 24, 40, 0.05);
-
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 15px;
-  --text-lg: 17px;
-  --text-xl: 20px;
-  --text-2xl: 26px;
-  --text-3xl: 34px;
-
-  --sidebar-w: 248px;
-  --topbar-h: 56px;
-  --content-max: 1240px;
-
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
-
   color-scheme: light;
 }
