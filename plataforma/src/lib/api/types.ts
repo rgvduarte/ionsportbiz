@@ -130,8 +130,10 @@ export interface Invitation {
   id: string;
   event_id: string;
   contact_id: string;
-  token: string;
-  checkin_code: string;
+  /** Link pessoal (credencial do convidado). null para quem não edita (leitura). */
+  token: string | null;
+  /** Código de entrada. null para quem não edita (leitura). */
+  checkin_code: string | null;
   status: InvitationStatus;
   wave: string | null;
   plus_ones_allowed: number;

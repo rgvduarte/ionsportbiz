@@ -1,7 +1,9 @@
-import { createBrowserRouter, createHashRouter, Navigate, type RouteObject } from 'react-router';
+import { createBrowserRouter, createHashRouter, Link, Navigate, type RouteObject } from 'react-router';
+import { Mail } from 'lucide-react';
 import { RequireStaff, RoleGate } from './guards';
+import { useAuth } from './AuthProvider';
 import { isNative } from '../native/platform';
-import { EmptyState, ButtonLink } from '../ui';
+import { ButtonLink, useDocumentTitle } from '../ui';
 import type { StaffRole } from '../lib/api';
 
 const CRM: StaffRole[] = ['admin', 'editor', 'viewer'];
@@ -19,13 +21,30 @@ function page(load: () => Promise<React.ComponentType>, roles?: StaffRole[]): Pi
   };
 }
 
+/**
+ * Endereço inexistente. Quem chega aqui é muitas vezes um convidado com o link incompleto:
+ * não o mandamos para a entrada da equipa. "Voltar ao início" só para a equipa ou na app.
+ */
 function NotFound() {
+  const { session, loading } = useAuth();
+  useDocumentTitle('Página não encontrada');
+  const staff = !!session?.staff;
   return (
-    <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center' }}>
-      <EmptyState title="Página não encontrada" actions={<ButtonLink to="/" variant="primary">Voltar ao início</ButtonLink>}>
-        O endereço não existe ou foi alterado.
-      </EmptyState>
-    </div>
+    <main className="ui-standalone">
+      <div className="ui-standalone__card">
+        <span className="ui-standalone__mark" aria-hidden><Mail /></span>
+        <p className="ui-standalone__eyebrow">Erro 404</p>
+        <h1>Página não encontrada</h1>
+        <p>O endereço não existe ou foi alterado. Se recebeu um convite, abra o link completo que lhe foi enviado por email ou mensagem.</p>
+        {!loading && (
+          <div className="ui-standalone__actions">
+            {staff || isNative
+              ? <ButtonLink to="/" variant="primary">Voltar ao início</ButtonLink>
+              : <Link to="/entrar" className="ui-standalone__link">Acesso da equipa</Link>}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
 

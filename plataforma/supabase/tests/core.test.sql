@@ -45,12 +45,29 @@ insert into contacts (first_name, last_name) values ('Carla', 'Dias') returning 
 insert into contacts (first_name, last_name) values ('Duarte', 'Eça') returning id as duarte \gset
 
 insert into invitations (event_id, contact_id, plus_ones_allowed, wave) values (:'ev', :'ana', 1, 'VIP')
-returning id as inv_ana, token as tok_ana, checkin_code as code_ana \gset
-insert into invitations (event_id, contact_id, wave) values (:'ev', :'bruno', 'Geral')
-returning id as inv_bruno, token as tok_bruno \gset
-insert into invitations (event_id, contact_id) values (:'ev', :'carla') returning id as inv_carla, token as tok_carla \gset
-insert into invitations (event_id, contact_id) values (:'ev', :'duarte') returning id as inv_duarte, token as tok_duarte \gset
-insert into invitations (event_id, contact_id) values (:'ev_draft', :'ana') returning token as tok_draft \gset
+returning id as inv_ana \gset
+insert into invitations (event_id, contact_id, wave) values (:'ev', :'bruno', 'Geral') returning id as inv_bruno \gset
+insert into invitations (event_id, contact_id) values (:'ev', :'carla') returning id as inv_carla \gset
+insert into invitations (event_id, contact_id) values (:'ev', :'duarte') returning id as inv_duarte \gset
+insert into invitations (event_id, contact_id) values (:'ev_draft', :'ana') returning id as inv_draft \gset
+-- Link e código: não se leem da tabela; o editor recebe-os na vista.
+select tests.throws(format('select token from invitations where id = %L', :'inv_ana'), 'permission denied');
+select tests.throws(format('select checkin_code from invitations where id = %L', :'inv_ana'), 'permission denied');
+select tests.throws(format('select * from invitations where id = %L', :'inv_ana'), 'permission denied');
+select token as tok_ana, checkin_code as code_ana from invitation_overview where id = :'inv_ana' \gset
+select token as tok_bruno from invitation_overview where id = :'inv_bruno' \gset
+select token as tok_carla from invitation_overview where id = :'inv_carla' \gset
+select token as tok_duarte from invitation_overview where id = :'inv_duarte' \gset
+select token as tok_draft from invitation_overview where id = :'inv_draft' \gset
+select tests.ok(:'tok_ana' ~ '^[A-Za-z0-9_-]{22}$', 'editor recebe o link na vista');
+select tests.ok(:'code_ana' ~ '^[2-9A-HJKMNP-Z]{10}$', 'editor recebe o código na vista');
+select tests.eq((select count(*) from invitations i where i.event_id = :'ev' and i.status = 'draft'), 4::bigint, 'colunas permitidas legíveis');
+insert into invitations (event_id, contact_id) values (:'ev', :'ana') on conflict (event_id, contact_id) do nothing returning id;
+-- Como o PostgREST: update/delete com returning das colunas pedidas.
+update invitations set wave = 'VIP' where id = :'inv_ana' returning id, wave;
+insert into invitations (event_id, contact_id) values (:'ev_draft', :'bruno') returning id as inv_tmp \gset
+delete from invitations where id = :'inv_tmp' returning id;
+select tests.throws(format('update invitations set wave = %L where id = %L returning token', 'X', :'inv_ana'), 'permission denied');
 select tests.eq((select invited_by from invitations where id = :'inv_ana'), :'editor'::uuid, 'invited_by preenchido');
 select tests.throws(format($$insert into invitations (event_id, contact_id) values (%L, %L)$$, :'ev', :'ana'), 'duplicate key');
 
@@ -124,6 +141,11 @@ select tests.throws(format('select public.checkin_lookup(%L, %L)', :'ev', :'code
 select set_config('request.jwt.claim.sub', :'viewer', false);
 select tests.eq((select count(*) from contacts), 4::bigint, 'leitura vê contactos');
 select tests.ok((select count(*) from invitation_overview where event_id = :'ev') = 4, 'leitura vê a lista do evento');
+select tests.eq((select count(*) from invitation_overview where event_id = :'ev' and (token is not null or checkin_code is not null)),
+                0::bigint, 'leitura não recebe links nem códigos');
+select tests.throws(format('select token from invitations where id = %L', :'inv_ana'), 'permission denied');
+select tests.ok((select token from public.invitation_secret(:'inv_ana')) is null, 'invitation_secret não serve à leitura');
+select tests.eq((select count(*) from invitations where event_id = :'ev'), 4::bigint, 'leitura lê os convites sem o link');
 select tests.throws($$insert into contacts (first_name) values ('X')$$, 'row-level security');
 update contacts set notes = 'alterado' where id = :'ana';
 select tests.eq((select notes from contacts where id = :'ana'), 'Nota interna', 'leitura não altera');
@@ -134,6 +156,11 @@ select set_config('request.jwt.claim.sub', :'porta', false);
 select tests.eq((select count(*) from contacts), 0::bigint, 'porta não vê o CRM');
 select tests.eq((select count(*) from invitations), 0::bigint, 'porta não vê convites');
 select tests.eq((select count(*) from events), 2::bigint, 'porta vê eventos');
+select tests.eq((select count(*) from invitation_overview), 0::bigint, 'porta não vê a lista');
+select public.event_stats(:'ev') as st_porta \gset
+select tests.eq((:'st_porta'::jsonb -> 'by_segment'), '[]'::jsonb, 'porta não recebe segmentos do CRM');
+select tests.eq((:'st_porta'::jsonb -> 'by_wave'), '[]'::jsonb, 'porta não recebe vagas');
+select tests.eq((:'st_porta'::jsonb ->> 'invited')::int, 4, 'porta recebe os totais');
 
 select public.checkin_lookup(:'ev', lower(:'code_ana')) as l \gset
 select tests.eq((:'l'::jsonb ->> 'first_name'), 'Ana', 'procura por código (minúsculas)');
@@ -174,6 +201,16 @@ select tests.eq((:'st'::jsonb #>> '{by_status,declined}')::int, 1, 'stats: recus
 select tests.eq((:'st'::jsonb ->> 'expected_attendees')::int, 4, 'stats: pessoas esperadas');
 select tests.eq((:'st'::jsonb ->> 'responded')::int, 4, 'stats: responderam');
 select tests.eq((:'st'::jsonb ->> 'capacity')::int, 4, 'stats: lotação');
+select tests.eq(jsonb_array_length(:'st'::jsonb -> 'by_wave'), 3, 'stats: vagas para quem lê o CRM');
+select tests.eq(jsonb_array_length(:'st'::jsonb -> 'by_segment'), 2, 'stats: segmentos para quem lê o CRM');
+
+-- Eventos: o editor cria e altera, mas só o administrador elimina (apaga tudo em cascata).
+insert into events (slug, name, starts_at) values ('para-apagar', 'Para apagar', now() + interval '90 days')
+returning id as ev_del \gset
+update events set name = 'Para apagar (editado)' where id = :'ev_del';
+select tests.eq((select name from events where id = :'ev_del'), 'Para apagar (editado)', 'editor altera eventos');
+delete from events where id = :'ev_del';
+select tests.eq((select count(*) from events where id = :'ev_del'), 1::bigint, 'editor não elimina eventos');
 
 select public.mark_sent(array[:'inv_ana']::uuid[], 'whatsapp') as resent \gset
 select tests.eq((select status from invitations where id = :'inv_ana'), 'accepted'::invitation_status, 'reenvio não recua o estado');
@@ -213,11 +250,38 @@ select public.contact_export(:'ana') as ex \gset
 select tests.ok(jsonb_array_length(:'ex'::jsonb -> 'invitations') = 2, 'exportação inclui os convites');
 select tests.ok(not ((:'ex'::jsonb -> 'invitations' -> 0) ? 'token'), 'exportação sem token');
 
+delete from events where id = :'ev_del';
+select tests.eq((select count(*) from events where id = :'ev_del'), 0::bigint, 'administrador elimina eventos');
+
+-- Apagamento (RGPD): o link e o código antigos deixam de funcionar.
+insert into deliveries (invitation_id, channel, status, error)
+values (:'inv_ana', 'email', 'failed', 'Invalid recipient ana.silva@exemplo.pt');
 select public.anonymize_contact(:'ana');
 select tests.eq((select first_name || coalesce(email, '') || coalesce(phone, '') from contacts where id = :'ana'), 'Anónimo', 'dados pessoais apagados');
 select tests.eq((select count(*) from companions where invitation_id = :'inv_ana'), 0::bigint, 'acompanhantes apagados');
 select tests.eq((select count(*) from activities where contact_id = :'ana' and kind = 'note'), 0::bigint, 'notas apagadas');
 select tests.eq((select status from invitations where id = :'inv_ana'), 'accepted'::invitation_status, 'números do evento mantêm-se');
+select tests.eq((select count(*) from deliveries where invitation_id = :'inv_ana' and error is not null), 0::bigint, 'erros de envio apagados');
+select tests.ok((select token from invitation_overview where id = :'inv_ana') is distinct from :'tok_ana', 'link novo');
+select tests.ok((select checkin_code from invitation_overview where id = :'inv_ana') is distinct from :'code_ana', 'código novo');
+select tests.ok(public.checkin_lookup(:'ev', :'code_ana') is null, 'código antigo não dá entrada');
+select tests.ok(public.checkin_lookup(:'ev', 'https://convites.exemplo.pt/c/' || :'tok_ana') is null, 'link antigo não dá entrada');
+select token as tok_ana_new from invitation_overview where id = :'inv_ana' \gset
+
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select tests.ok(public.guest_invitation(:'tok_ana') is null, 'link antigo deixa de abrir');
+select tests.ok(public.guest_invitation(:'tok_ana_new') is null, 'convite de contacto apagado não abre');
+select tests.throws(format($$select public.guest_respond(%L, true, '{}', '[{"full_name":"Acompanhante"}]', 'Nota', true)$$, :'tok_ana'), 'not_found');
+select tests.throws(format('select public.guest_respond(%L, false)', :'tok_ana_new'), 'not_found');
+select tests.ok(not public.guest_request_erasure(:'tok_ana'), 'pedido com link antigo não é aceite');
+
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', :'admin', false);
+select tests.eq((select marketing_consent from contacts where id = :'ana'), false, 'consentimento continua retirado');
+select tests.eq((select count(*) from companions where invitation_id = :'inv_ana'), 0::bigint, 'nenhum acompanhante novo');
 
 select tests.throws(format($$update staff set role = 'viewer' where user_id = %L$$, :'admin'), 'last_admin');
 update staff set role = 'admin' where user_id = :'editor';

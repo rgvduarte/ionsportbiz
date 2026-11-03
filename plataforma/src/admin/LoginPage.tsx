@@ -4,7 +4,7 @@ import { Mail } from 'lucide-react';
 import './admin.css';
 import { useAuth } from '../app/AuthProvider';
 import { api, errorMessage } from '../lib/api';
-import { Alert, Button, Field, Input } from '../ui';
+import { Alert, Button, Field, Input, useDocumentTitle } from '../ui';
 
 export function LoginPage() {
   const { session, refresh } = useAuth();
@@ -16,6 +16,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState<'password' | 'link' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linkSent, setLinkSent] = useState(false);
+  useDocumentTitle('Entrar');
 
   if (session?.staff) return <Navigate to={from} replace />;
 

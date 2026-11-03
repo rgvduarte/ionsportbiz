@@ -19,8 +19,10 @@
   --c-accent-hover: #0c1d38;
   --c-accent-soft: #e9eef6;
   --c-accent-text: #13294b;
-  --c-gold: #a8831f;
+  --c-gold: #a8831f;          /* filetes, contornos e ícones; para texto usar --c-gold-text */
+  --c-gold-text: #86680f;     /* 5,2:1 sobre branco, 4,7:1 sobre --c-gold-soft (WCAG AA) */
   --c-gold-soft: #f7f1e1;
+  --c-gold-light: #e7c868;    /* dourado sobre o azul-marinho (barra lateral) */
 
   --c-success: #12704a;
   --c-success-soft: #e6f4ed;
@@ -31,7 +33,12 @@
   --c-info: #1f4fd1;
   --c-info-soft: #e9effd;
 
-  --focus-ring: 0 0 0 3px rgba(19, 41, 75, 0.22);
+  /* Foco do teclado: anel azul-marinho de 2px separado do elemento por 2px de branco (WCAG 2.4.7/2.4.11). */
+  --focus-ring: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent);
+  /* Campos de texto: o contorno passa a 2px azul-marinho, com halo discreto. */
+  --focus-ring-field: 0 0 0 1px var(--c-accent), 0 0 0 4px rgba(19, 41, 75, 0.14);
+  /* Sobre fundo azul-marinho (barra lateral, barra de topo). */
+  --focus-ring-inverse: 0 0 0 2px var(--c-gold-light);
 
   --radius-sm: 6px;
   --radius: 8px;

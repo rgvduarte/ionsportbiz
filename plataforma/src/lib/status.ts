@@ -4,7 +4,7 @@ import type { Tone } from '../ui/Feedback';
 export const INVITATION_STATUS: Record<InvitationStatus, { label: string; tone: Tone }> = {
   draft: { label: 'Por enviar', tone: 'neutral' },
   sent: { label: 'Enviado', tone: 'info' },
-  opened: { label: 'Aberto', tone: 'accent' },
+  opened: { label: 'Visto', tone: 'accent' },  // o convidado abriu o convite (≠ evento «Aberto»)
   accepted: { label: 'Confirmado', tone: 'success' },
   declined: { label: 'Recusado', tone: 'danger' },
   cancelled: { label: 'Cancelado', tone: 'neutral' },
@@ -38,7 +38,7 @@ export const ACTIVITY: Record<string, string> = {
   'invitation.created': 'Convite criado',
   'invitation.sent': 'Convite enviado',
   'invitation.resent': 'Convite reenviado',
-  'invitation.opened': 'Convite aberto',
+  'invitation.opened': 'Convite visto',
   'invitation.accepted': 'Presença confirmada',
   'invitation.declined': 'Convite recusado',
   'invitation.cancelled': 'Convite cancelado',

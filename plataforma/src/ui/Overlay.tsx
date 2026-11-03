@@ -24,7 +24,9 @@ function useModalBehaviour(open: boolean, onClose: () => void) {
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     requestAnimationFrame(() => {
-      const target = panel.current?.querySelector<HTMLElement>('[autofocus], input, select, textarea, button:not(.ui-dialog__close)');
+      // Primeiro campo editável (os só de leitura e desativados não recebem o foco inicial).
+      const target = panel.current?.querySelector<HTMLElement>('[autofocus], input:not([readonly]):not([disabled]):not([type="hidden"]), '
+        + 'select:not([disabled]), textarea:not([readonly]):not([disabled]), button:not(.ui-dialog__close):not([disabled])');
       (target ?? panel.current)?.focus();
     });
     return () => {

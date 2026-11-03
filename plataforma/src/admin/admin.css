@@ -53,6 +53,9 @@
 .adm-nav a svg { width: 18px; height: 18px; opacity: 0.85; }
 .adm-nav a:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .adm-nav a.active { background: rgba(255, 255, 255, 0.12); color: #fff; }
+/* Sobre o azul-marinho, o anel de foco é dourado claro (o azul não se veria). */
+.adm-sidebar a:focus-visible, .adm-sidebar button:focus-visible,
+.adm-topbar button:focus-visible { box-shadow: var(--focus-ring-inverse); }
 
 .adm-user {
   margin-top: auto;
@@ -104,16 +107,18 @@
   .adm-topbar .ui-btn--ghost { color: #fff; }
   .adm-topbar .ui-btn--ghost:hover { background: rgba(255, 255, 255, 0.1); }
   .adm-topbar__title { font-weight: 600; }
+  /* Fechado, o menu sai do ecrã e fica escondido do teclado e dos leitores de ecrã (visibility). */
   .adm-sidebar {
     position: fixed;
     z-index: 45;
     left: 0;
     width: min(300px, 86vw);
     transform: translateX(-100%);
-    transition: transform 0.2s ease-out;
+    visibility: hidden;
+    transition: transform 0.2s ease-out, visibility 0s linear 0.2s;
     box-shadow: var(--shadow-lg);
   }
-  .adm-sidebar.open { transform: none; }
+  .adm-sidebar.open { transform: none; visibility: visible; transition: transform 0.2s ease-out; }
   .adm-scrim { position: fixed; inset: 0; z-index: 44; background: rgba(16, 24, 40, 0.45); }
   .adm-content { padding: 20px 16px calc(40px + var(--safe-bottom)); }
 }

@@ -11,11 +11,13 @@ interface FieldProps {
   required?: boolean;
   className?: string;
   /** Um único controlo (Input, Select, Textarea). Recebe id, aria-invalid e aria-describedby. */
-  children: ReactElement<{ id?: string; 'aria-invalid'?: boolean; 'aria-describedby'?: string; required?: boolean }>;
+  children: ReactElement<{ id?: string; 'aria-invalid'?: boolean; 'aria-describedby'?: string; required?: boolean; readOnly?: boolean }>;
 }
 
-export function Field({ label, hint, error, required, className, children }: FieldProps) {
+export function Field({ label, hint, error, required: requiredProp, className, children }: FieldProps) {
   const id = useId();
+  // Só de leitura: não se preenche, por isso não se marca como obrigatório.
+  const required = requiredProp && !(isValidElement(children) && children.props.readOnly);
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const control = isValidElement(children)

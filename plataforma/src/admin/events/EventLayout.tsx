@@ -4,7 +4,7 @@ import { api, type EventRecord } from '../../lib/api';
 import { useAsync } from '../../lib/useAsync';
 import { formatLongDate, formatTime } from '../../lib/format';
 import { EVENT_STATUS } from '../../lib/status';
-import { Badge, LoadError, Loader, RouteTabs } from '../../ui';
+import { Badge, LoadError, Loader, RouteTabs, useDocumentTitle } from '../../ui';
 import { usePermissions } from '../../app/AuthProvider';
 
 export interface EventContext {
@@ -19,10 +19,13 @@ export function useEventContext(): EventContext {
   return useOutletContext<EventContext>();
 }
 
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 export function EventLayout() {
   const { eventId = '' } = useParams();
   const can = usePermissions();
   const { data: event, error, loading, reload, setData } = useAsync(() => api.events.get(eventId), [eventId]);
+  useDocumentTitle(event?.name);
 
   if (loading && !event) return <Loader />;
   if (error || !event) return <LoadError error={error} onRetry={reload} />;
@@ -36,7 +39,7 @@ export function EventLayout() {
           <Link to="/admin/eventos" className="ui-page-header__back"><ChevronLeft aria-hidden />Eventos</Link>
           <h1 className="ui-page-header__title">{event.name}</h1>
           <div className="evt-head__meta">
-            <span><CalendarDays aria-hidden />{formatLongDate(event.starts_at, event.timezone)}, {formatTime(event.starts_at, event.timezone)}</span>
+            <span><CalendarDays aria-hidden />{capitalize(formatLongDate(event.starts_at, event.timezone))}, {formatTime(event.starts_at, event.timezone)}</span>
             {event.venue_name && <span><MapPin aria-hidden />{event.venue_name}</span>}
             <Badge tone={status.tone} dot title={status.hint}>{status.label}</Badge>
           </div>

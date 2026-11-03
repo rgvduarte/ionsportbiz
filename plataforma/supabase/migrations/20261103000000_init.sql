@@ -16,6 +16,8 @@
 --     e só funciona através das funções guest_* (security definer).
 --   * O papel "checkin" (staff da porta) não lê o CRM: só vê nome, entidade e estado,
 --     através das funções checkin_*.
+--   * O link pessoal e o código de entrada só chegam a admin/editor (invitation_secret);
+--     a leitura vê os convites sem eles. Apagar os dados (RGPD) troca ambos.
 
 -- ───────────────────────────── Tipos ─────────────────────────────
 
@@ -351,16 +353,29 @@ create index deliveries_invitation_idx on public.deliveries (invitation_id, crea
 
 -- ───────────────────────────── Vistas ─────────────────────────────
 
+-- Link pessoal e código de entrada: são as credenciais do convidado, por isso só admin/editor os recebem.
+-- A leitura vê a lista sem eles (com o link podia responder em nome do convidado ou entrar no evento).
+create function public.invitation_secret(p_invitation_id uuid, out token text, out checkin_code text)
+language sql stable security definer set search_path = '' as $$
+  select i.token, i.checkin_code from public.invitations i
+  where i.id = p_invitation_id and public.can_edit()
+$$;
+
 -- Lista de convidados de um evento, com os dados do contacto (respeita a RLS de quem consulta).
+-- token e checkin_code vêm de invitation_secret: null para quem não edita.
 create view public.invitation_overview with (security_invoker = true) as
-select i.*,
+select i.id, i.event_id, i.contact_id, s.token, s.checkin_code,
+       i.status, i.wave, i.plus_ones_allowed, i.invited_by, i.sent_at, i.sent_channel,
+       i.first_opened_at, i.last_opened_at, i.open_count, i.responded_at, i.answers, i.guest_note,
+       i.checked_in_at, i.checked_in_by, i.created_at, i.updated_at,
        c.salutation, c.first_name, c.last_name, c.email, c.phone, c.organization, c.job_title,
        c.segment, c.tags, c.language, c.marketing_consent,
        (select count(*) from public.companions m where m.invitation_id = i.id)::int as companions_count,
        (select count(*) from public.companions m where m.invitation_id = i.id and m.checked_in_at is not null)::int
          as companions_checked_in
 from public.invitations i
-join public.contacts c on c.id = i.contact_id;
+join public.contacts c on c.id = i.contact_id
+left join lateral public.invitation_secret(i.id) s on true;
 
 -- ───────────────────────────── RLS ─────────────────────────────
 
@@ -381,7 +396,10 @@ create policy staff_admin_delete on public.staff for delete to authenticated usi
 
 -- Eventos e programa: toda a equipa lê (o check-in precisa do nome e da data); admin/editor escrevem.
 create policy events_read on public.events for select to authenticated using (public.is_staff());
-create policy events_write on public.events for all to authenticated using (public.can_edit()) with check (public.can_edit());
+create policy events_insert on public.events for insert to authenticated with check (public.can_edit());
+create policy events_update on public.events for update to authenticated using (public.can_edit()) with check (public.can_edit());
+-- Eliminar um evento apaga em cascata convites, entradas, envios e histórico: só administradores.
+create policy events_delete on public.events for delete to authenticated using (public.is_admin());
 create policy sessions_read on public.event_sessions for select to authenticated using (public.is_staff());
 create policy sessions_write on public.event_sessions for all to authenticated using (public.can_edit()) with check (public.can_edit());
 
@@ -405,6 +423,14 @@ create policy activities_note on public.activities for insert to authenticated
 -- Defesa em profundidade: o anon não toca em tabelas, mesmo que alguém desligue a RLS.
 revoke all on all tables in schema public from anon;
 revoke all on all sequences in schema public from anon;
+
+-- O link pessoal e o código de entrada não se leem da tabela, nem por quem lê o CRM:
+-- admin/editor recebem-nos através de invitation_overview (invitation_secret).
+revoke select on public.invitations from authenticated;
+grant select (id, event_id, contact_id, status, wave, plus_ones_allowed, invited_by, sent_at, sent_channel,
+              first_opened_at, last_opened_at, open_count, responded_at, answers, guest_note,
+              checked_in_at, checked_in_by, created_at, updated_at)
+  on public.invitations to authenticated;
 
 -- ───────────────────────────── Funções do convidado (anon) ─────────────────────────────
 
@@ -446,7 +472,8 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 -- Abre o convite a partir do link pessoal. Regista a abertura (exceto em pré-visualização).
--- Devolve null se o link não existir, se o convite foi cancelado ou se o evento ainda é rascunho.
+-- Devolve null se o link não existir, se o convite foi cancelado, se o evento ainda é rascunho
+-- ou se os dados do convidado foram apagados (RGPD).
 create function public.guest_invitation(p_token text, p_track boolean default true) returns jsonb
 language plpgsql volatile security definer set search_path = '' as $$
 declare
@@ -456,8 +483,11 @@ begin
     return null;
   end if;
   select i.* into v
-  from public.invitations i join public.events e on e.id = i.event_id
-  where i.token = p_token and i.status <> 'cancelled' and e.status in ('open', 'closed');
+  from public.invitations i
+  join public.events e on e.id = i.event_id
+  join public.contacts c on c.id = i.contact_id
+  where i.token = p_token and i.status <> 'cancelled' and e.status in ('open', 'closed')
+    and c.anonymized_at is null;
   if not found then
     return null;
   end if;
@@ -492,7 +522,9 @@ begin
   if p_token is null or length(p_token) <> 22 then
     raise exception 'not_found';
   end if;
-  select * into v from public.invitations where token = p_token and status <> 'cancelled';
+  select i.* into v
+  from public.invitations i join public.contacts ct on ct.id = i.contact_id
+  where i.token = p_token and i.status <> 'cancelled' and ct.anonymized_at is null;
   if not found then
     raise exception 'not_found';
   end if;
@@ -577,7 +609,9 @@ language plpgsql volatile security definer set search_path = '' as $$
 declare
   v public.invitations;
 begin
-  select * into v from public.invitations where token = p_token and length(p_token) = 22;
+  select i.* into v
+  from public.invitations i join public.contacts c on c.id = i.contact_id
+  where i.token = p_token and length(p_token) = 22 and c.anonymized_at is null;
   if not found then
     return false;
   end if;
@@ -610,11 +644,13 @@ begin
   return n;
 end $$;
 
--- Números do painel de um evento.
+-- Números do painel de um evento. A receção (sem acesso ao CRM) recebe só os totais:
+-- by_wave e by_segment vêm vazios.
 create function public.event_stats(p_event_id uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare
   result jsonb;
+  v_crm boolean := public.can_read_crm();
 begin
   if not public.is_staff() then
     raise exception 'forbidden';
@@ -640,16 +676,16 @@ begin
     'expected_attendees', coalesce(sum(1 + comp) filter (where status = 'accepted'), 0),
     'checked_in', coalesce(count(*) filter (where checked_in_at is not null), 0) + coalesce(sum(comp_in), 0),
     'capacity', (select capacity from public.events where id = p_event_id),
-    'by_wave', coalesce((select jsonb_agg(w order by w ->> 'wave') from (
+    'by_wave', case when v_crm then coalesce((select jsonb_agg(w order by w ->> 'wave') from (
         select jsonb_build_object('wave', coalesce(wave, ''), 'invited', count(*),
           'accepted', count(*) filter (where status = 'accepted'),
           'declined', count(*) filter (where status = 'declined')) as w
-        from inv group by wave) x), '[]'),
-    'by_segment', coalesce((select jsonb_agg(s order by s ->> 'segment') from (
+        from inv group by wave) x), '[]') else '[]' end,
+    'by_segment', case when v_crm then coalesce((select jsonb_agg(s order by s ->> 'segment') from (
         select jsonb_build_object('segment', coalesce(segment, ''), 'invited', count(*),
           'accepted', count(*) filter (where status = 'accepted'),
           'declined', count(*) filter (where status = 'declined')) as s
-        from inv group by segment) y), '[]'))
+        from inv group by segment) y), '[]') else '[]' end)
   into result
   from inv;
   return result;
@@ -778,7 +814,14 @@ begin
   end if;
   delete from public.companions m using public.invitations i
    where m.invitation_id = i.id and i.contact_id = p_contact_id;
-  update public.invitations set answers = '{}', guest_note = null where contact_id = p_contact_id;
+  -- Novo link e novo código: o link e o QR antigos deixam de funcionar. Os convites ficam para os números do evento.
+  update public.invitations
+     set answers = '{}', guest_note = null, token = public.new_token(), checkin_code = public.new_checkin_code()
+   where contact_id = p_contact_id;
+  -- O erro do fornecedor de email pode conter o endereço.
+  update public.deliveries d set error = null
+    from public.invitations i
+   where d.invitation_id = i.id and i.contact_id = p_contact_id and d.error is not null;
   delete from public.activities where contact_id = p_contact_id and kind = 'note';
   update public.activities set detail = '{}' where contact_id = p_contact_id;
   perform public.log_activity('contact.anonymized', p_contact_id, null, null, null, '{}');
@@ -910,6 +953,8 @@ grant execute on function public.can_edit() to authenticated;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.can_check_in() to authenticated;
 grant execute on function public.staff_role_of_current_user() to authenticated;
+-- Usada pela vista invitation_overview (security invoker); devolve null a quem não edita.
+grant execute on function public.invitation_secret(uuid) to authenticated;
 grant execute on function public.mark_sent(uuid[], public.channel) to authenticated;
 grant execute on function public.event_stats(uuid) to authenticated;
 grant execute on function public.import_contacts(jsonb, uuid, text, integer) to authenticated;

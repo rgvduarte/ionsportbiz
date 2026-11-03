@@ -7,6 +7,9 @@ import type {
 } from '../types';
 import { ApiError } from '../errors';
 
+/** Convite guardado: o link e o código existem sempre; o contrato só os entrega a quem edita. */
+export type DemoInvitation = Invitation & { token: string; checkin_code: string };
+
 export interface DemoDb {
   version: 1;
   currentUserId: string | null;
@@ -14,14 +17,15 @@ export interface DemoDb {
   events: EventRecord[];
   sessions: EventSession[];
   contacts: Contact[];
-  invitations: Invitation[];
+  invitations: DemoInvitation[];
   companions: Companion[];
   activities: Activity[];
   templates: MessageTemplate[];
   deliveries: { id: string; invitation_id: string; channel: Channel; template_id: string | null; status: 'sent' | 'failed'; created_at: string }[];
 }
 
-const KEY = 'convites-demo-v1';
+// Muda quando os dados fictícios mudam, para a demonstração recomeçar com os novos.
+const KEY = 'convites-demo-v2';
 
 // ───────── Utilitários ─────────
 
@@ -105,6 +109,12 @@ export const CAN_EDIT: StaffRole[] = ['admin', 'editor'];
 export const CAN_CHECK_IN: StaffRole[] = ['admin', 'editor', 'checkin'];
 export const ALL_STAFF: StaffRole[] = ['admin', 'editor', 'checkin', 'viewer'];
 
+/** Como invitation_secret: o link pessoal e o código de entrada só chegam a quem edita. */
+export function withSecrets<T extends Invitation>(row: T): T {
+  const s = currentStaff();
+  return s && CAN_EDIT.includes(s.role) ? row : { ...row, token: null, checkin_code: null };
+}
+
 // ───────── Linha do tempo ─────────
 
 export function logActivity(a: Omit<Activity, 'id' | 'created_at' | 'actor_id'> & { created_at?: string; actor_id?: string | null }): void {
@@ -167,23 +177,48 @@ const FIRST = ['Ana', 'Beatriz', 'Carolina', 'Diana', 'Filipa', 'Helena', 'Inês
   'António', 'Bernardo', 'Duarte', 'Francisco', 'Gonçalo', 'Henrique', 'João', 'Luís', 'Miguel', 'Nuno', 'Pedro', 'Ricardo', 'Rui', 'Tiago'];
 const LAST = ['Almeida', 'Barros', 'Carvalho', 'Costa', 'Ferreira', 'Gomes', 'Lopes', 'Marques', 'Martins', 'Mendes', 'Moreira', 'Nunes',
   'Oliveira', 'Pereira', 'Pinto', 'Ribeiro', 'Rodrigues', 'Santos', 'Silva', 'Sousa', 'Teixeira', 'Vieira'];
-const ORGS: [string, string, string][] = [
-  ['Atlântida Capital', 'atlantidacapital', 'Clientes'],
-  ['Grupo Serra Alta', 'serraalta', 'Clientes'],
-  ['Lusovia Energia', 'lusovia', 'Parceiros'],
-  ['Tejo Digital', 'tejodigital', 'Parceiros'],
-  ['Fundação Horizonte', 'fundacaohorizonte', 'Institucional'],
-  ['Montado Seguros', 'montadoseguros', 'Clientes'],
-  ['Ribeira & Associados', 'ribeira-associados', 'Fornecedores'],
-  ['Porto Norte Logística', 'portonorte', 'Fornecedores'],
-  ['Estrela Media', 'estrelamedia', 'Imprensa'],
-  ['Instituto Aurora', 'institutoaurora', 'Institucional'],
-  ['Câmara Municipal de Vale Novo', 'cm-valenovo', 'Institucional'],
-  ['Revista Panorama', 'panorama', 'Imprensa'],
+type OrgKind = 'empresa' | 'imprensa' | 'autarquia' | 'instituicao';
+const ORGS: [string, string, string, OrgKind][] = [
+  ['Atlântida Capital', 'atlantidacapital', 'Clientes', 'empresa'],
+  ['Grupo Serra Alta', 'serraalta', 'Clientes', 'empresa'],
+  ['Lusovia Energia', 'lusovia', 'Parceiros', 'empresa'],
+  ['Tejo Digital', 'tejodigital', 'Parceiros', 'empresa'],
+  ['Fundação Horizonte', 'fundacaohorizonte', 'Institucional', 'instituicao'],
+  ['Montado Seguros', 'montadoseguros', 'Clientes', 'empresa'],
+  ['Ribeira & Associados', 'ribeira-associados', 'Fornecedores', 'empresa'],
+  ['Porto Norte Logística', 'portonorte', 'Fornecedores', 'empresa'],
+  ['Estrela Media', 'estrelamedia', 'Imprensa', 'imprensa'],
+  ['Instituto Aurora', 'institutoaurora', 'Institucional', 'instituicao'],
+  ['Câmara Municipal de Vale Novo', 'cm-valenovo', 'Institucional', 'autarquia'],
+  ['Revista Panorama', 'panorama', 'Imprensa', 'imprensa'],
 ];
-const JOBS = ['Presidente do Conselho de Administração', 'Administrador Executivo', 'Diretora-Geral', 'Diretor Financeiro', 'Diretora de Comunicação',
-  'Head of Partnerships', 'Jornalista', 'Vereadora', 'Diretor Comercial', 'Assessora de Imprensa', 'Sócio', 'Chief Operating Officer'];
+// Cargos coerentes com o tipo de entidade, no feminino [0] e no masculino [1].
+const JOBS: Record<OrgKind, [string, string][]> = {
+  empresa: [
+    ['Presidente do Conselho de Administração', 'Presidente do Conselho de Administração'],
+    ['Administradora Executiva', 'Administrador Executivo'], ['Diretora-Geral', 'Diretor-Geral'],
+    ['Diretora Financeira', 'Diretor Financeiro'], ['Diretora de Comunicação', 'Diretor de Comunicação'],
+    ['Diretora de Parcerias', 'Diretor de Parcerias'], ['Diretora Comercial', 'Diretor Comercial'],
+    ['Diretora de Operações', 'Diretor de Operações'], ['Assessora de Imprensa', 'Assessor de Imprensa'],
+  ],
+  imprensa: [['Jornalista', 'Jornalista'], ['Diretora de Redação', 'Diretor de Redação'], ['Editora', 'Editor']],
+  autarquia: [['Presidente da Câmara', 'Presidente da Câmara'], ['Vereadora', 'Vereador'], ['Chefe de Gabinete', 'Chefe de Gabinete']],
+  instituicao: [
+    ['Presidente do Conselho Diretivo', 'Presidente do Conselho Diretivo'], ['Diretora Executiva', 'Diretor Executivo'],
+    ['Diretora de Relações Institucionais', 'Diretor de Relações Institucionais'], ['Vogal do Conselho Diretivo', 'Vogal do Conselho Diretivo'],
+  ],
+};
+/** Cargos que podem repetir-se na mesma entidade; os outros (presidente, diretor-geral, …) são de uma só pessoa. */
+const REPEATABLE = new Set(['Administrador Executivo', 'Assessor de Imprensa', 'Jornalista', 'Editor', 'Vereador', 'Vogal do Conselho Diretivo']);
+/** Prefixos de telemóvel em Portugal (91, 92, 93, 96). */
+const MOBILE = ['1', '2', '3', '6'];
 const TAGS = ['vip', 'orador', 'patrocinador', 'imprensa', 'conselho consultivo', 'novo contacto'];
+
+/** Telemóvel português válido (E.164) a partir de um número aleatório entre 0 e 1. */
+function mobile(r: number): string {
+  const n = Math.floor(r * MOBILE.length * 10_000_000);
+  return `+3519${MOBILE[Math.floor(n / 10_000_000)]}${String(n % 10_000_000).padStart(7, '0')}`;
+}
 
 function seed(): DemoDb {
   const rnd = prng(20271015);
@@ -230,7 +265,7 @@ function seed(): DemoDb {
       description: 'Apresentação do relatório anual, entrega dos Prémios Horizonte e jantar.',
       starts_at: iso(main.getTime()),
       ends_at: iso(main.getTime() + 5 * 3_600_000),
-      venue_name: 'Palácio da Exemplo',
+      venue_name: 'Palácio do Exemplo',
       venue_address: 'Rua das Janelas Verdes 1, 1200-000 Lisboa',
       venue_maps_url: 'https://maps.google.com/?q=Rua+das+Janelas+Verdes+Lisboa',
       dress_code: 'Black tie',
@@ -284,25 +319,38 @@ function seed(): DemoDb {
 
   const contacts: Contact[] = [];
   const used = new Set<string>();
+  const roles = new Set<string>();
+  const jobFor = (org: string, kind: OrgKind, female: boolean) => {
+    const list = JOBS[kind];
+    const free = (j: number) => REPEATABLE.has(list[j][1]) || !roles.has(`${org}|${list[j][1]}`);
+    let j = Math.floor(rnd() * list.length);
+    for (let n = 0; n < list.length && !free(j); n++) j = (j + 1) % list.length;
+    if (!free(j)) j = list.findIndex(([, m]) => REPEATABLE.has(m));
+    roles.add(`${org}|${list[j][1]}`);
+    return list[j][female ? 0 : 1];
+  };
   while (contacts.length < 64) {
     const first = pick(FIRST);
-    const last = `${pick(LAST)} ${pick(LAST)}`;
+    const a = Math.floor(rnd() * LAST.length);
+    let b = Math.floor(rnd() * LAST.length);
+    if (b === a) b = (b + 1) % LAST.length; // sem apelidos repetidos ("Almeida Almeida")
+    const last = `${LAST[a]} ${LAST[b]}`;
     if (used.has(first + last)) continue;
     used.add(first + last);
-    const [org, domain, segment] = pick(ORGS);
+    const [org, domain, segment, kind] = pick(ORGS);
     const female = FIRST.indexOf(first) < 14;
     const consent = rnd() < 0.45;
     const createdAt = iso(now - (30 + Math.floor(rnd() * 300)) * day);
     const strip = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     contacts.push({
       id: uid(),
-      salutation: rnd() < 0.5 ? (female ? 'Exma. Senhora' : 'Exmo. Senhor') : female ? 'Dra.' : 'Dr.',
+      salutation: rnd() < 0.5 ? (female ? 'Exma. Senhora' : 'Exmo. Senhor') : female ? 'Dr.ª' : 'Dr.',
       first_name: first,
       last_name: last,
       email: `${strip(first)}.${strip(last.split(' ')[1])}@${domain}.example`,
-      phone: rnd() < 0.8 ? `+3519${Math.floor(10_000_000 + rnd() * 89_999_999)}` : null,
+      phone: rnd() < 0.8 ? mobile(rnd()) : null,
       organization: org,
-      job_title: pick(JOBS),
+      job_title: jobFor(org, kind, female),
       segment,
       tags: rnd() < 0.55 ? [...new Set([pick(TAGS), ...(rnd() < 0.3 ? [pick(TAGS)] : [])])].sort() : [],
       language: rnd() < 0.12 ? 'en' : 'pt',
@@ -336,7 +384,7 @@ function seed(): DemoDb {
     const sentAt = status === 'draft' ? null : createdAt + 2 * day;
     const openedAt = ['opened', 'accepted', 'declined'].includes(status) && sentAt ? sentAt + Math.floor(rnd() * 5 + 1) * day : null;
     const respondedAt = ['accepted', 'declined'].includes(status) && openedAt ? openedAt + Math.floor(rnd() * 3_600_000) : null;
-    const inv: Invitation = {
+    const inv: DemoInvitation = {
       id: uid(),
       event_id: event.id,
       contact_id: contact.id,
@@ -396,23 +444,45 @@ function seed(): DemoDb {
     addInvitation(events[1], c, i < 23 ? 'accepted' : i < 27 ? 'declined' : 'opened', 'Geral', i < 20);
   });
 
+  // Os mesmos textos que o módulo de mensagens sugere (defaultTemplates), mais um lembrete.
+  const paragraphs = (...p: string[]) => p.join('\n\n');
+  const event = '{{evento}}\n{{data}}\n{{local}}';
   d.templates = [
     {
       id: '00000000-0000-4000-8000-0000000007a1', event_id: events[0].id, channel: 'email', name: 'Convite formal',
       subject: 'Convite — {{evento}}',
-      body: '{{tratamento}} {{nome}},\n\n{{anfitriao}} {{texto_convite}}\n\n{{data}}\n{{local}}\n\nPara confirmar a sua presença, utilize o seu convite pessoal:\n{{link}}\n\nCom os melhores cumprimentos,',
+      body: paragraphs(
+        '{{tratamento}} {{nome_completo}},',
+        '{{anfitriao}} {{texto_convite}}',
+        event,
+        'Agradecemos que confirme a sua presença até {{prazo}}, através do seu convite pessoal, onde encontrará também o programa e as informações práticas.',
+        '{{link}}',
+        'Com os melhores cumprimentos,\n{{anfitriao}}',
+      ),
       created_at: created, updated_at: created,
     },
     {
       id: '00000000-0000-4000-8000-0000000007a2', event_id: events[0].id, channel: 'whatsapp', name: 'Convite WhatsApp',
       subject: null,
-      body: 'Bom dia {{nome}}. Em nome da Fundação Exemplo, envio o seu convite pessoal para o {{evento}} ({{data}}). Pode confirmar aqui: {{link}}',
+      body: paragraphs(
+        '{{tratamento}} {{nome_completo}},',
+        '{{anfitriao}} {{texto_convite}}',
+        event,
+        'Pode confirmar a sua presença até {{prazo}} no seu convite pessoal:\n{{link}}',
+        'Com os melhores cumprimentos.',
+      ),
       created_at: created, updated_at: created,
     },
     {
       id: '00000000-0000-4000-8000-0000000007a3', event_id: events[0].id, channel: 'email', name: 'Lembrete',
       subject: 'Lembrete — {{evento}}',
-      body: '{{tratamento}} {{nome}},\n\nRecordamos o convite para o {{evento}}, a {{data}}. Agradecemos a confirmação até {{prazo}}:\n{{link}}',
+      body: paragraphs(
+        '{{tratamento}} {{nome_completo}},',
+        'Permitimo-nos recordar o convite para o {{evento}}:',
+        '{{data}}\n{{local}}',
+        'Agradecemos que confirme a sua presença até {{prazo}}, através do seu convite pessoal:\n{{link}}',
+        'Com os melhores cumprimentos,\n{{anfitriao}}',
+      ),
       created_at: created, updated_at: created,
     },
   ];
