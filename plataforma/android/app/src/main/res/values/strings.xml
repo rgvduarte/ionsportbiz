@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">ion Convidados</string>
-    <string name="title_activity_main">ion Convidados</string>
-    <string name="package_name">pt.convites.app</string>
-    <string name="custom_url_scheme">pt.convites.app</string>
-</resources>
