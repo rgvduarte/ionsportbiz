@@ -24,6 +24,9 @@ export const ATTENDEES: Attendee[] = [
 
 export const attendeeById = (id: string) => ATTENDEES.find((a) => a.id === id);
 
+/** Interesses que o participante pode escolher para o networking (os do diretório). */
+export const INTERESTS: string[] = [...new Set(ATTENDEES.flatMap((a) => a.interests))].sort((a, b) => a.localeCompare(b));
+
 /** Meeting slots offered on conference day (Networking Lounge). */
 export const MEETING_SLOTS = [
   '2027-03-23T11:00:00+00:00',

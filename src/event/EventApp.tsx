@@ -13,14 +13,16 @@ import Networking, { AttendeeDetail } from './screens/Networking';
 import SessionDetail from './screens/SessionDetail';
 import { SpeakerDetail, SpeakerList } from './screens/Speakers';
 import Welcome from './screens/Welcome';
+import { Boot } from './components/ui';
 
+/** A app é só para convidados: sem convite guardado neste dispositivo, mostra a entrada. */
 function Shell() {
-  const { state } = useStore();
+  const { state, ready } = useStore();
   const { pathname } = useLocation();
   // Bloco com chavetas: nos browsers recentes scrollTo devolve uma Promise, e o React trataria o valor
   // devolvido como função de limpeza do efeito ("l is not a function").
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
-  if (!state.profile) return <Navigate to="/welcome" replace />;
+  if (!state.token) return ready ? <Navigate to="/welcome" replace /> : <Boot />;
   return (
     <div className="app">
       <Outlet />

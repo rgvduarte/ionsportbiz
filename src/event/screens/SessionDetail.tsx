@@ -1,21 +1,24 @@
 import { Link, useParams } from 'react-router';
-import { CalendarPlus, ChevronRight, Clock, MapPin, Star } from 'lucide-react';
+import { CalendarPlus, Check, ChevronRight, Clock, Lock, MapPin, Star } from 'lucide-react';
 import { sessionById, speakerById, stageById } from '../data/event';
 import { Avatar, Empty, TopBar } from '../components/ui';
 import { downloadIcs } from '../lib/ics';
 import { fmtDay, fmtTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
-import { useStore } from '../lib/store';
+import { sessionAccess } from '../lib/invite';
+import { usePass, useStore } from '../lib/store';
 
 export default function SessionDetail() {
   const { id = '' } = useParams();
   const { t, locale } = useI18n();
   const { state, dispatch } = useStore();
+  const pass = usePass();
   const s = sessionById(id);
   if (!s) return (<><TopBar back /><main className="screen pad"><Empty>404</Empty></main></>);
   const stage = stageById(s.stageId);
   const fav = state.favorites.includes(s.id);
   const speakers = s.speakerIds.map(speakerById).filter(Boolean);
+  const access = sessionAccess(s, pass);
 
   return (
     <>
@@ -37,7 +40,21 @@ export default function SessionDetail() {
           </li>
         </ul>
         <p className="lead">{s.description}</p>
-        {s.access === 'vip' && <p className="muted small">{t('agenda.vipNote')}</p>}
+        {access === 'included' && (
+          <p className="access-note ok">
+            <Check size={18} /> <span>{t('agenda.includedIn')} <strong>{pass!.name}</strong>.</span>
+          </p>
+        )}
+        {access === 'notIncluded' && (
+          <p className="access-note">
+            <Lock size={18} /> <span>{t('agenda.notIncludedIn')} <strong>{pass!.name}</strong>.</span>
+          </p>
+        )}
+        {access === 'unknown' && (
+          <p className="access-note">
+            <Lock size={18} /> <span>{t('agenda.vipNote')}</span>
+          </p>
+        )}
 
         <div className="actions">
           <button className={`btn ${fav ? 'btn-primary' : 'btn-outline'}`} onClick={() => dispatch({ type: 'toggleFav', id: s.id })} aria-pressed={fav}>

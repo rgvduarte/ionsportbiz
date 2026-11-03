@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { CalendarCheck, Check, Hourglass, Search, UserCheck, UserPlus, X } from 'lucide-react';
+import { CalendarCheck, Check, Hourglass, Search, Sparkles, UserCheck, UserPlus, X } from 'lucide-react';
 import { ATTENDEES, MEETING_SLOTS, SECTORS, attendeeById } from '../data/people';
 import type { Attendee } from '../data/types';
 import { Avatar, Chip, Empty, Segmented, TopBar } from '../components/ui';
@@ -111,9 +111,15 @@ export default function Networking() {
   const [sector, setSector] = useState<string>('all');
 
   const term = q.trim().toLowerCase();
-  const people = ATTENDEES.filter((a) => sector === 'all' || a.sector === sector).filter(
-    (a) => !term || `${a.name} ${a.company} ${a.role} ${a.interests.join(' ')}`.toLowerCase().includes(term),
-  );
+  // Primeiro quem partilha interesses (ou o setor) com o participante: escolhem-se no perfil.
+  const { interests: mine, sector: mySector } = state.prefs;
+  const common = (a: Attendee) => a.interests.filter((i) => mine.includes(i));
+  const score = (a: Attendee) => common(a).length * 2 + (a.sector === mySector ? 1 : 0);
+  const people = ATTENDEES.filter((a) => sector === 'all' || a.sector === sector)
+    .filter((a) => !term || `${a.name} ${a.company} ${a.role} ${a.interests.join(' ')}`.toLowerCase().includes(term))
+    .map((a, i) => ({ a, i, score: score(a) }))
+    .sort((x, y) => y.score - x.score || x.i - y.i)
+    .map((x) => x.a);
   const incoming = ATTENDEES.filter((a) => state.connections[a.id] === 'incoming');
   const others = ATTENDEES.filter((a) => state.connections[a.id] === 'connected' || state.connections[a.id] === 'outgoing');
   const meetings = [...state.meetings].sort((a, b) => a.slot.localeCompare(b.slot));
@@ -148,8 +154,16 @@ export default function Networking() {
                 <Chip key={s} active={sector === s} onClick={() => setSector(s)}>{t(`sector.${s}`)}</Chip>
               ))}
             </div>
+            {mine.length === 0 && (
+              <Link to="/more/profile" className="net-hint pad-x">
+                <Sparkles size={16} /> {t('net.pickInterests')}
+              </Link>
+            )}
             <div className="list pad-x">
-              {people.map((a) => <PersonRow key={a.id} a={a} />)}
+              {people.map((a) => {
+                const shared = common(a);
+                return <PersonRow key={a.id} a={a} note={shared.length ? `${t('net.common')}: ${shared.join(', ')}` : undefined} />;
+              })}
             </div>
           </>
         )}

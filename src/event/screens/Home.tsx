@@ -6,7 +6,8 @@ import { SessionCard } from '../components/SessionCard';
 import { SectionTitle, TopBar } from '../components/ui';
 import { fmtDate, fmtShortDay } from '../lib/format';
 import { useI18n, type I18nKey } from '../lib/i18n';
-import { pendingCount, useStore } from '../lib/store';
+import { pendingCount, useProfile, useStore } from '../lib/store';
+import { useAccessLabel } from '../lib/access';
 import { useCountdown } from '../lib/useCountdown';
 import { asset } from '../lib/asset';
 
@@ -33,6 +34,8 @@ function Countdown() {
 export default function Home() {
   const { t, locale } = useI18n();
   const { state } = useStore();
+  const profile = useProfile();
+  const access = useAccessLabel();
   const pending = pendingCount(state);
   const mine = SESSIONS.filter((s) => state.favorites.includes(s.id)).sort((a, b) => a.start.localeCompare(b.start));
 
@@ -55,6 +58,11 @@ export default function Home() {
         <img src={asset('images/markets-strip.webp')} alt="PT Portugal · UAE United Arab Emirates · WW Worldwide · HK Hong Kong" className="markets-strip" />
 
         <section className="pad">
+          {profile.firstName && (
+            <p className="greeting">
+              {t('home.hello')}, <strong>{profile.firstName}</strong>
+            </p>
+          )}
           <p className="kicker">{t('home.countdown')}</p>
           <Countdown />
         </section>
@@ -70,7 +78,10 @@ export default function Home() {
         <section className="quick pad">
           <Link to="/credential" className="quick-card">
             <QrCode size={26} />
-            <span>{t('home.quick.credential')}</span>
+            <span>
+              {t('home.quick.credential')}
+              {access && <small className="quick-sub">{access.label}</small>}
+            </span>
           </Link>
           <Link to="/agenda" className="quick-card">
             <CalendarDays size={26} />

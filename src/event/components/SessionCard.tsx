@@ -4,7 +4,8 @@ import type { Session } from '../data/types';
 import { speakerById, stageById } from '../data/event';
 import { fmtTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
-import { useStore } from '../lib/store';
+import { sessionAccess } from '../lib/invite';
+import { usePass, useStore } from '../lib/store';
 import { Avatar } from './ui';
 
 export function SessionCard({ session, showDay }: { session: Session; showDay?: string }) {
@@ -13,8 +14,9 @@ export function SessionCard({ session, showDay }: { session: Session; showDay?: 
   const stage = stageById(session.stageId);
   const fav = state.favorites.includes(session.id);
   const speakers = session.speakerIds.map(speakerById).filter(Boolean);
+  const access = sessionAccess(session, usePass());
   return (
-    <article className="session-card" style={{ ['--stage' as string]: stage.color }}>
+    <article className={`session-card${access === 'notIncluded' ? ' not-included' : ''}`} style={{ ['--stage' as string]: stage.color }}>
       <Link to={`/agenda/${session.id}`} className="session-main">
         <div className="session-time">
           {showDay && <span className="session-day">{showDay}</span>}
@@ -26,6 +28,8 @@ export function SessionCard({ session, showDay }: { session: Session; showDay?: 
             <span className="dot" /> {stage.name}
           </span>
           {session.access === 'vip' && <span className="vip-tag">{t('common.vipOnly')}</span>}
+          {access === 'included' && <span className="access-tag ok">{t('agenda.included')}</span>}
+          {access === 'notIncluded' && <span className="access-tag">{t('agenda.notIncluded')}</span>}
         </div>
         {speakers.length > 0 && (
           <div className="session-speakers">

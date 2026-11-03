@@ -1,14 +1,16 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ChevronRight, CircleHelp, ExternalLink, Handshake, Languages, LogOut, Mail, Mic, Newspaper, Pencil, Star } from 'lucide-react';
 import { EVENT, PARTNERS } from '../data/event';
+import { INTERESTS, SECTORS } from '../data/people';
+import type { Sector } from '../data/types';
 import { NEWS, newsById } from '../data/news';
 import { Avatar, Empty, TopBar } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { fmtDate } from '../lib/format';
 import { useI18n } from '../lib/i18n';
-import { useStore } from '../lib/store';
-import { ProfileForm } from './Welcome';
+import { useAccessLabel } from '../lib/access';
+import { useProfile, useStore } from '../lib/store';
 import { asset } from '../lib/asset';
 
 function Item({ to, href, icon, children, onClick }: { to?: string; href?: string; icon: ReactNode; children: ReactNode; onClick?: () => void }) {
@@ -26,19 +28,31 @@ function Item({ to, href, icon, children, onClick }: { to?: string; href?: strin
 
 export default function More() {
   const { t, lang, setLang } = useI18n();
-  const { state, dispatch } = useStore();
+  const { signOut } = useStore();
   const navigate = useNavigate();
-  const p = state.profile!;
+  const p = useProfile();
+  const access = useAccessLabel();
+  const [confirmOut, setConfirmOut] = useState(false);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  // A confirmação fica no fim da página: traz-se para cima da barra de separadores.
+  useEffect(() => {
+    const el = confirmRef.current;
+    if (!confirmOut || !el) return;
+    const tabbar = document.querySelector('.ev .tabbar')?.getBoundingClientRect().height ?? 0;
+    const overflow = el.getBoundingClientRect().bottom - (window.innerHeight - tabbar - 16);
+    if (overflow > 0) window.scrollBy({ top: overflow, behavior: 'smooth' });
+  }, [confirmOut]);
+  const sub = [p.role, p.company].filter(Boolean).join(' · ');
   return (
     <>
       <TopBar title={t('more.title')} />
       <main className="screen pad">
         <Link to="/more/profile" className="me-card">
-          <Avatar name={p.name} size={64} />
+          <Avatar name={p.name || '?'} size={64} />
           <div className="row-body">
             <strong>{p.name}</strong>
-            <span className="muted small">{p.role} · {p.company}</span>
-            <span className="small lime">{p.ticket === 'vip' ? t('cred.vip') : t('cred.conference')}</span>
+            {sub && <span className="muted small">{sub}</span>}
+            {access && <span className={`small${access.approved ? ' lime' : ' amber'}`}>{access.label}</span>}
           </div>
           <Pencil size={18} className="muted" />
         </Link>
@@ -56,8 +70,8 @@ export default function More() {
             <span className="menu-icon"><Languages size={20} /></span>
             <span className="menu-label">{t('more.language')}</span>
             <div className="lang-switch">
-              <button className={lang === 'pt' ? 'on' : ''} onClick={() => setLang('pt')}>PT</button>
-              <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>EN</button>
+              <button className={lang === 'pt' ? 'on' : ''} onClick={() => setLang('pt')} aria-pressed={lang === 'pt'}>PT</button>
+              <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')} aria-pressed={lang === 'en'}>EN</button>
             </div>
           </div>
         </div>
@@ -65,9 +79,24 @@ export default function More() {
         <nav className="menu">
           <Item href={EVENT.website} icon={<img src={asset('images/logo-bubble.webp')} alt="" width={20} height={20} />}>{t('more.website')}</Item>
           <Item href={EVENT.contact} icon={<Mail size={20} />}>{t('more.contact')}</Item>
-          <Item icon={<LogOut size={20} />} onClick={() => { dispatch({ type: 'signOut' }); navigate('/welcome', { replace: true }); }}>
-            {t('more.logout')}
-          </Item>
+          {confirmOut ? (
+            <div className="menu-confirm" role="group" aria-label={t('more.logout')} ref={confirmRef}>
+              <p>{t('more.logoutConfirm')}</p>
+              <div className="actions">
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirmOut(false)}>{t('common.cancel')}</button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => void signOut().then(() => navigate('/welcome', { replace: true }))}
+                >
+                  <LogOut size={16} /> {t('more.logoutYes')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Item icon={<LogOut size={20} />} onClick={() => setConfirmOut(true)}>
+              {t('more.logout')}
+            </Item>
+          )}
         </nav>
 
         <img src={asset('images/wordmark.webp')} alt="International Business & Sports Conference — PT" className="wordmark" />
@@ -77,24 +106,74 @@ export default function More() {
   );
 }
 
+/** Perfil: nome, empresa e cargo vêm do convite (só leitura); setor e interesses são do participante. */
 export function EditProfile() {
   const { t } = useI18n();
   const { state, dispatch } = useStore();
+  const p = useProfile();
   const navigate = useNavigate();
   const toast = useToast();
+  const [sector, setSector] = useState<Sector>(state.prefs.sector);
+  const [interests, setInterests] = useState<string[]>(state.prefs.interests);
+  const toggle = (i: string) => setInterests((all) => (all.includes(i) ? all.filter((x) => x !== i) : [...all, i]));
+
   return (
     <>
       <TopBar back title={t('more.profile')} />
       <main className="screen pad">
-        <ProfileForm
-          initial={state.profile!}
-          submitLabel={t('common.save')}
-          onSubmit={(profile) => {
-            dispatch({ type: 'updateProfile', profile });
+        <section className="invite-card">
+          <p className="kicker">{t('profile.fromInvite')}</p>
+          <dl>
+            <div><dt>{t('profile.name')}</dt><dd>{p.name || '—'}</dd></div>
+            <div><dt>{t('profile.role')}</dt><dd>{p.role || '—'}</dd></div>
+            <div><dt>{t('profile.company')}</dt><dd>{p.company || '—'}</dd></div>
+          </dl>
+          <p className="muted small">{t('profile.fromInviteNote')}</p>
+        </section>
+
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            dispatch({ type: 'updatePrefs', prefs: { sector, interests: INTERESTS.filter((i) => interests.includes(i)) } });
             toast(t('common.saved'));
             navigate(-1);
           }}
-        />
+        >
+          <div>
+            <h2 className="h2 flush">{t('profile.networking')}</h2>
+            <p className="muted small">{t('profile.networkingNote')}</p>
+          </div>
+          <label>
+            <span>{t('profile.sector')}</span>
+            <select value={sector} onChange={(e) => setSector(e.target.value as Sector)}>
+              {SECTORS.map((s) => (
+                <option key={s} value={s}>
+                  {t(`sector.${s}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <fieldset className="interest-picker">
+            <legend>{t('profile.interests')}</legend>
+            <div className="tags">
+              {INTERESTS.map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`tag tag-toggle${interests.includes(i) ? ' on' : ''}`}
+                  aria-pressed={interests.includes(i)}
+                  onClick={() => toggle(i)}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <button className="btn btn-primary btn-block" type="submit">
+            {t('common.save')}
+          </button>
+        </form>
       </main>
     </>
   );

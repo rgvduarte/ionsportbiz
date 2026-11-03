@@ -74,3 +74,12 @@ export function DemoNote() {
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
+
+/** Enquanto se lê o convite guardado no dispositivo (sem piscar a entrada). */
+export function Boot() {
+  return (
+    <div className="boot" aria-busy>
+      <img src={asset('images/logo-bubble.webp')} alt="ion" />
+    </div>
+  );
+}
