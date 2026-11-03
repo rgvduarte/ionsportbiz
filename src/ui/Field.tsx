@@ -81,7 +81,7 @@ export function SearchInput({
   value, onSearch, placeholder = 'Pesquisar…', className, autoFocus,
 }: { value: string; onSearch: (v: string) => void; placeholder?: string; className?: string; autoFocus?: boolean }) {
   const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
+  useEffect(() => { setText(value); }, [value]);
   useEffect(() => {
     if (text === value) return;
     const t = setTimeout(() => onSearch(text), 250);

@@ -17,7 +17,9 @@ import Welcome from './screens/Welcome';
 function Shell() {
   const { state } = useStore();
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Bloco com chavetas: nos browsers recentes scrollTo devolve uma Promise, e o React trataria o valor
+  // devolvido como função de limpeza do efeito ("l is not a function").
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   if (!state.profile) return <Navigate to="/welcome" replace />;
   return (
     <div className="app">

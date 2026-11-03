@@ -23,7 +23,7 @@ export function AdminLayout() {
   const location = useLocation();
   const confirm = useConfirm();
   const menuButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   // Menu móvel: ao abrir, o foco passa para a navegação; Escape fecha e devolve o foco ao botão.
   useEffect(() => {
