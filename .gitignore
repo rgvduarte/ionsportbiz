@@ -8,3 +8,6 @@ ios/App/App/public
 android/app/src/main/assets/public
 test-results
 playwright-report
+
+# Manual (scripts/manual): build da app e capturas intermédias
+docs/manual/build/

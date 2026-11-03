@@ -36,6 +36,42 @@ function safeColor(color: string | null | undefined): string {
   return color && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color.trim()) ? color.trim() : DEFAULT_ACCENT;
 }
 
+// Contraste (WCAG): a cor da marca pode ser clara (ex.: verde-lima da ion) e o email tem fundo branco.
+function rgb(hex: string): [number, number, number] {
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+function luminance([r, g, b]: number[]): number {
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrast(a: number[], b: number[]): number {
+  const [l1, l2] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+const WHITE = [255, 255, 255];
+const INK = [16, 24, 40];
+
+/** Texto do botão: branco sobre cores escuras, quase preto sobre cores claras. */
+export function textOnAccent(accent: string): string {
+  return contrast(rgb(accent), WHITE) >= 4.5 ? '#ffffff' : '#101828';
+}
+
+/** Cor dos links sobre branco: escurece a cor da marca até ter contraste suficiente. */
+export function linkColor(accent: string): string {
+  const base = rgb(accent);
+  let c = base;
+  for (let t = 0.1; contrast(c, WHITE) < 4.5 && t <= 1; t += 0.1) c = base.map((v, i) => Math.round(v + (INK[i] - v) * t)) as [number, number, number];
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
 function safeUrl(url: string | null | undefined): string | null {
   const u = (url ?? '').trim();
   return /^https?:\/\/[^\s"'<>]+$/i.test(u) ? u : null;
@@ -71,7 +107,7 @@ function button(label: string, url: string, accent: string): string {
   const u = escapeHtml(url);
   return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:28px 0;border-collapse:separate;">
 <tr><td align="center" bgcolor="${accent}" style="border-radius:6px;background:${accent};">
-<a href="${u}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:15px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;border-radius:6px;">${l}</a>
+<a href="${u}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:15px;font-weight:600;line-height:1;color:${textOnAccent(accent)};text-decoration:none;border-radius:6px;">${l}</a>
 </td></tr></table>`;
 }
 
@@ -90,7 +126,7 @@ export function buildEmailHtml(c: EmailContent): string {
     const before: string[] = [];
     const flush = () => {
       if (before.length) {
-        blocks.push(`<p style="margin:0 0 18px;font-family:${SERIF};font-size:17px;line-height:1.6;color:#1d2433;">${before.map((l) => inline(l, accent)).join('<br>')}</p>`);
+        blocks.push(`<p style="margin:0 0 18px;font-family:${SERIF};font-size:17px;line-height:1.6;color:#1d2433;">${before.map((l) => inline(l, linkColor(accent))).join('<br>')}</p>`);
         before.length = 0;
       }
     };

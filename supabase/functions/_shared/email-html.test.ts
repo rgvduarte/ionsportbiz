@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildEmailHtml, buildEmailText, escapeHtml, splitParagraphs } from './email-html';
+import { buildEmailHtml, buildEmailText, escapeHtml, linkColor, splitParagraphs, textOnAccent } from './email-html';
 
 const link = 'https://convites.exemplo.pt/c/abcdefghijklmnopqrstuv';
 
@@ -76,5 +76,19 @@ describe('buildEmailText', () => {
   it('acrescenta o link quando falta no corpo', () => {
     const text = buildEmailText({ bodyText: 'Olá', ctaLabel: 'Abrir o convite', ctaUrl: link });
     expect(text).toBe(`Olá\n\nAbrir o convite: ${link}\n`);
+  });
+});
+
+describe('contraste da cor da marca', () => {
+  it('botão: texto escuro sobre verde-lima, branco sobre azul-marinho', () => {
+    expect(textOnAccent('#ccff00')).toBe('#101828');
+    expect(textOnAccent('#13294b')).toBe('#ffffff');
+  });
+
+  it('links: o verde-lima é escurecido para se ler sobre branco', () => {
+    expect(linkColor('#13294b')).toBe('#13294b');
+    const c = linkColor('#ccff00');
+    expect(c).not.toBe('#ccff00');
+    expect(c).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
