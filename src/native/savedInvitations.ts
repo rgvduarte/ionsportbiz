@@ -79,9 +79,11 @@ function add(item: Omit<SavedInvitation, 'savedAt'> & { savedAt?: string }): Pro
       eventName: item.eventName,
       startsAt: item.startsAt,
       ...((item.timezone ?? existing?.timezone) ? { timezone: item.timezone ?? existing?.timezone } : {}),
-      savedAt: existing?.savedAt ?? item.savedAt ?? new Date().toISOString(),
+      // Um savedAt explícito (ex.: "Abrir a app do evento") passa este convite para o mais recente.
+      savedAt: item.savedAt ?? existing?.savedAt ?? new Date().toISOString(),
     };
-    if (existing && existing.eventName === next.eventName && existing.startsAt === next.startsAt && existing.timezone === next.timezone) return;
+    if (existing && existing.eventName === next.eventName && existing.startsAt === next.startsAt && existing.timezone === next.timezone
+      && existing.savedAt === next.savedAt) return;
     await write(JSON.stringify([next, ...all.filter((s) => s.token !== item.token)]));
   });
 }

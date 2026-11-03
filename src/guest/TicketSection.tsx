@@ -73,7 +73,8 @@ export function TicketSection({ view, token, preview }: { view: GuestView; token
       toast.info(t.eventAppPreview);
       return;
     }
-    await savedInvitations.add({ token, eventName: e.name, startsAt: e.starts_at, timezone: e.timezone });
+    // savedAt de agora: a app do evento passa a usar este convite, mesmo que já estivesse guardado.
+    await savedInvitations.add({ token, eventName: e.name, startsAt: e.starts_at, timezone: e.timezone, savedAt: new Date().toISOString() });
     navigate('/');
   };
 
