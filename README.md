@@ -7,7 +7,7 @@ App e back-office da **ion — International Business & Sports Conference** (PT 
 - **Convite pessoal** (`/c/<token>`): confirmação de presença, acompanhantes, consentimento e bilhete.
 - **Apps iOS e Android** (Capacitor) a partir do mesmo código.
 
-**Demonstração:** https://ionsportbiz.app/demo/ com dados fictícios guardados só no browser. Back-office em https://ionsportbiz.app/demo/#/admin, entrar com `admin@demo.pt` e qualquer palavra-passe.
+**Demonstração:** https://ionsportbiz.app/demo/ com dados fictícios guardados só no browser. Back-office em https://ionsportbiz.app/demo/#/admin, entrar com `admin@demo.pt` e qualquer palavra-passe. Convites de teste: https://ionsportbiz.app/demo/#/c/ionDemoConvite2027New1 (por responder) e https://ionsportbiz.app/demo/#/c/ionDemoConvite2027VIP1 (aprovado, VIP Pass).
 
 ## Como funciona
 

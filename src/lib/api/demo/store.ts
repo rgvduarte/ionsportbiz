@@ -28,7 +28,7 @@ export interface DemoDb {
 }
 
 // Muda quando os dados fictícios mudam, para a demonstração recomeçar com os novos.
-const KEY = 'convites-demo-v4';
+const KEY = 'convites-demo-v5';
 
 // ───────── Utilitários ─────────
 
@@ -487,6 +487,18 @@ function seed(): DemoDb {
   // Os mesmos textos que o módulo de mensagens sugere (defaultTemplates), mais um lembrete.
   const paragraphs = (...p: string[]) => p.join('\n\n');
   const event = '{{evento}}\n{{data}}\n{{local}}';
+  // Convites de demonstração com links fixos, para testar em qualquer browser (os restantes são aleatórios):
+  //   /c/ionDemoConvite2027New1  ainda sem resposta → confirmar → por aprovar → aprovar no back-office → QR
+  //   /c/ionDemoConvite2027VIP1  já confirmado e aprovado com VIP Pass → credencial com QR
+  const mainInvites = d.invitations.filter((i) => i.event_id === events[0].id);
+  const fresh = mainInvites.find((i) => i.status === 'sent' && i.approval_status === 'pending');
+  const vipGuest = mainInvites.find((i) => i.status === 'accepted');
+  if (fresh) fresh.token = 'ionDemoConvite2027New1';
+  if (vipGuest) {
+    vipGuest.token = 'ionDemoConvite2027VIP1';
+    Object.assign(vipGuest, { approval_status: 'approved', pass_type_id: vip.id, approved_at: vipGuest.approved_at ?? vipGuest.responded_at, approved_by: admin });
+  }
+
   d.templates = [
     {
       id: '00000000-0000-4000-8000-0000000007a1', event_id: events[0].id, channel: 'email', name: 'Convite formal',

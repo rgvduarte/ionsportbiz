@@ -86,7 +86,7 @@ page.on('console', (m) => m.type() === 'error' && !/Failed to load resource|came
 // O WhatsApp abre-se noutra janela: não sai do manual.
 ctx.on('page', (p) => { if (p !== page) void p.close(); });
 
-const KEY = 'convites-demo-v4';
+const KEY = 'convites-demo-v5';
 const x = {
   base,
   page,
