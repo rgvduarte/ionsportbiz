@@ -1,6 +1,7 @@
 // Peças comuns da área do convidado: secção com título, mensagens de estado e esqueleto de carregamento.
 
 import type { CSSProperties, ReactNode } from 'react';
+import type { GuestView } from '../lib/api/types';
 import { accentPalette } from './utils';
 
 export function Section({ id, eyebrow, title, intro, children, className }: {
@@ -58,6 +59,9 @@ export function InvitationSkeleton({ label }: { label: string }) {
   );
 }
 
+/** Tema da página do convidado (branding.theme): claro, em papel, por omissão. */
+export const eventTheme = (e: Pick<GuestView['event'], 'branding'>): 'light' | 'dark' => (e.branding?.theme === 'dark' ? 'dark' : 'light');
+
 /** Variáveis CSS com a cor da marca do evento (ou o verde-lima da ion). */
 export function accentStyle(accent: string | null | undefined, theme: 'light' | 'dark' = 'light'): CSSProperties {
   const p = accentPalette(accent, theme);
@@ -67,5 +71,16 @@ export function accentStyle(accent: string | null | undefined, theme: 'light' | 
     '--gi-accent-soft': p.soft,
     '--gi-on-accent': p.on,
     '--gi-accent-text': p.text,
+  } as CSSProperties;
+}
+
+/** Variáveis CSS com a cor do tipo de acesso (VIP, Conferência…): faixa, marcas e texto legível sobre o papel. */
+export function passStyle(color: string | null | undefined, fallback: string | null | undefined, theme: 'light' | 'dark' = 'light'): CSSProperties {
+  const p = accentPalette(color ?? fallback, theme);
+  return {
+    '--gi-pass': p.accent,
+    '--gi-pass-on': p.on,
+    '--gi-pass-soft': p.soft,
+    '--gi-pass-text': p.text,
   } as CSSProperties;
 }

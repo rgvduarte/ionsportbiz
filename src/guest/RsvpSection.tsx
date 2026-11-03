@@ -1,12 +1,15 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { Check, CircleSlash, Clock, Minus, Plus, X } from 'lucide-react';
+import { Check, CircleSlash, Clock, Hourglass, Info, Minus, Plus, QrCode, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api';
 import type { GuestView, RsvpField } from '../lib/api/types';
 import { formatDate, formatLongDate, formatTime } from '../lib/format';
 import { Alert, Button, Checkbox, Field, Input, Select, Textarea, useToast } from '../ui';
 import { errorText, useGuestStrings } from './i18n';
-import { Section } from './parts';
-import { cleanAnswers, eventIsPast, initialAnswers, safeUrl, validateRsvp, type AnswerValue, type FormErrors } from './utils';
+import { ContactLinks } from './InfoSection';
+import { eventTheme, passStyle, Section } from './parts';
+import {
+  cleanAnswers, eventIsPast, guestPhase, initialAnswers, reservedPass, safeUrl, validateRsvp, type AnswerValue, type FormErrors,
+} from './utils';
 
 const NOTE_MAX = 1000;
 /** Erros que significam que o convite mudou entretanto: volta a carregar para mostrar o estado certo. */
@@ -33,7 +36,10 @@ export function RsvpSection({ view, token, preview, onUpdated, onStale }: Props)
   const t = useGuestStrings();
   const { invitation: inv, event: e } = view;
   const answered = inv.status === 'accepted' || inv.status === 'declined';
-  const canRespond = e.rsvp_open && !inv.checked_in_at;
+  const phase = guestPhase(inv);
+  // A equipa não pôde confirmar a presença: a resposta deixa de poder ser alterada aqui.
+  const canRespond = e.rsvp_open && !inv.checked_in_at && phase !== 'rejected';
+  const reserved = reservedPass(inv);
   const [editing, setEditing] = useState(false);
   const [choice, setChoice] = useState<Choice | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -52,7 +58,9 @@ export function RsvpSection({ view, token, preview, onUpdated, onStale }: Props)
   };
 
   let body;
-  if (answered && !editing) {
+  if (phase === 'rejected') {
+    body = <Rejected view={view} />;
+  } else if (answered && !editing) {
     body = (
       <Summary view={view} headingRef={headingRef} canChange={canRespond} deadline={deadline} past={eventIsPast(e)} onChange={() => setEditing(true)} />
     );
@@ -70,6 +78,7 @@ export function RsvpSection({ view, token, preview, onUpdated, onStale }: Props)
   } else {
     body = (
       <>
+        {reserved !== undefined && <ReservedPass view={view} pass={reserved} />}
         {deadline && <p className="gi-deadline"><Clock aria-hidden />{t.rsvpDeadline(deadline)}</p>}
         <div className="gi-choice" role="group" aria-label={t.rsvpTitle}>
           <button
@@ -93,6 +102,9 @@ export function RsvpSection({ view, token, preview, onUpdated, onStale }: Props)
             {t.decline}
           </button>
         </div>
+        {e.requires_approval && inv.approval_status === 'pending' && (
+          <p className="gi-fineprint"><Info aria-hidden />{t.approvalNote}</p>
+        )}
         {choice && (
           <RsvpForm
             key={choice}
@@ -115,7 +127,7 @@ export function RsvpSection({ view, token, preview, onUpdated, onStale }: Props)
   }
 
   return (
-    <Section id="gi-rsvp" eyebrow={t.rsvpEyebrow} title={t.rsvpTitle} intro={!answered && canRespond ? t.rsvpIntro : undefined}>
+    <Section id="gi-rsvp" eyebrow={t.rsvpEyebrow} title={t.rsvpTitle} intro={!answered && canRespond && reserved === undefined ? t.rsvpIntro : undefined}>
       {body}
     </Section>
   );
@@ -134,6 +146,13 @@ function Summary({ view, headingRef, canChange, deadline, past, onChange }: {
   const t = useGuestStrings();
   const { invitation: inv, event: e } = view;
   const accepted = inv.status === 'accepted';
+  const phase = guestPhase(inv);
+  // Confirmou mas a equipa ainda não aprovou: sem credencial, com os passos que faltam.
+  const awaiting = phase === 'awaiting_approval' && !past;
+  const pass = phase === 'approved' ? inv.pass_type : null;
+  const respondedOn = inv.responded_at
+    ? `${formatDate(inv.responded_at, e.timezone, t.locale)}, ${formatTime(inv.responded_at, e.timezone, t.locale)}`
+    : null;
   const rows: [string, string][] = [];
   if (accepted && inv.plus_ones_allowed > 0) {
     rows.push([t.summaryCompanions, inv.companions.map((m) => m.full_name).join(', ') || t.summaryNone]);
@@ -148,16 +167,53 @@ function Summary({ view, headingRef, canChange, deadline, past, onChange }: {
   if (inv.guest_note) rows.push([t.summaryNote, inv.guest_note]);
 
   return (
-    <div className={`gi-done gi-done--${accepted ? 'accepted' : 'declined'}`}>
+    <div className={`gi-done gi-done--${awaiting ? 'awaiting' : accepted ? 'accepted' : 'declined'}`}>
       <div className="gi-done__head">
-        <span className="gi-done__icon" aria-hidden>{accepted ? <Check /> : <CircleSlash />}</span>
+        <span className="gi-done__icon" aria-hidden>{awaiting ? <Hourglass /> : accepted ? <Check /> : <CircleSlash />}</span>
         <div>
-          <h3 className="gi-done__title" ref={headingRef} tabIndex={-1}>{accepted ? t.acceptedTitle : t.declinedTitle}</h3>
+          <h3 className="gi-done__title" ref={headingRef} tabIndex={-1}>
+            {awaiting ? (
+              <>
+                {t.awaitingTitle}
+                <span className="visually-hidden"> — </span>
+                <span className="gi-done__status">{t.awaitingStatus}</span>
+              </>
+            ) : accepted ? t.acceptedTitle : t.declinedTitle}
+          </h3>
           <p className="gi-done__body">
-            {!accepted ? t.declinedBody : !past ? t.acceptedBody : inv.checked_in_at ? t.attendedBody : t.acceptedPastBody}
+            {awaiting
+              ? t.awaitingBody
+              : !accepted ? t.declinedBody
+                : !past ? (pass ? t.approvedBody(pass.name) : t.acceptedBody)
+                  : inv.checked_in_at ? t.attendedBody : t.acceptedPastBody}
           </p>
         </div>
       </div>
+      {awaiting && (
+        <ol className="gi-steps" aria-label={t.stepsLabel}>
+          <li className="gi-step gi-step--done">
+            <span className="gi-step__dot" aria-hidden><Check /></span>
+            <span className="gi-step__text">
+              <span className="gi-step__title">{t.stepConfirmed}<span className="visually-hidden"> ({t.stepDone})</span></span>
+              {respondedOn && <span className="gi-step__hint">{respondedOn}</span>}
+            </span>
+          </li>
+          <li className="gi-step gi-step--current" aria-current="step">
+            <span className="gi-step__dot" aria-hidden><Hourglass /></span>
+            <span className="gi-step__text">
+              <span className="gi-step__title">{t.stepApproval}<span className="visually-hidden"> ({t.stepCurrent})</span></span>
+              <span className="gi-step__hint gi-step__hint--live">{t.stepApprovalNow}</span>
+            </span>
+          </li>
+          <li className="gi-step">
+            <span className="gi-step__dot" aria-hidden><QrCode /></span>
+            <span className="gi-step__text">
+              <span className="gi-step__title">{t.stepCredential}<span className="visually-hidden"> ({t.stepNext})</span></span>
+              <span className="gi-step__hint">{t.stepCredentialHint}</span>
+            </span>
+          </li>
+        </ol>
+      )}
       {rows.length > 0 && (
         <dl className="gi-summary">
           {rows.map(([k, v]) => (
@@ -169,14 +225,60 @@ function Summary({ view, headingRef, canChange, deadline, past, onChange }: {
         </dl>
       )}
       <div className="gi-done__foot">
-        {inv.responded_at && (
+        {respondedOn && (
           <p className="gi-done__meta">
-            {t.respondedOn(`${formatDate(inv.responded_at, e.timezone, t.locale)}, ${formatTime(inv.responded_at, e.timezone, t.locale)}`)}
+            {t.respondedOn(respondedOn)}
             {canChange && deadline && <> {t.changeUntil(deadline)}</>}
           </p>
         )}
         {canChange && <Button onClick={onChange}>{t.changeAnswer}</Button>}
       </div>
+    </div>
+  );
+}
+
+// ───────── Presença não confirmada pela equipa ─────────
+
+function Rejected({ view }: { view: GuestView }) {
+  const t = useGuestStrings();
+  const e = view.event;
+  return (
+    <div className="gi-done gi-done--rejected">
+      <div className="gi-done__head">
+        <span className="gi-done__icon" aria-hidden><Info /></span>
+        <div>
+          <h3 className="gi-done__title">{t.rejectedTitle}</h3>
+          <p className="gi-done__body">{t.rejectedBody}</p>
+        </div>
+      </div>
+      {(e.contact_email || e.contact_phone) && (
+        <div className="gi-done__contacts">
+          <p>{t.rejectedContacts}</p>
+          <ContactLinks event={e} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────── Acesso reservado antes da resposta ─────────
+
+function ReservedPass({ view, pass }: { view: GuestView; pass: GuestView['invitation']['pass_type'] }) {
+  const t = useGuestStrings();
+  const style = passStyle(pass?.color, view.event.branding?.accent, eventTheme(view.event));
+  return (
+    <div className="gi-reserved" style={style}>
+      <p className="gi-reserved__eyebrow"><Sparkles aria-hidden />{t.reservedEyebrow}</p>
+      {/* O nome do acesso não se parte entre linhas ("VIP / Pass"). */}
+      <p className="gi-reserved__title">{t.reservedTitle(pass ? pass.name.replace(/ /g, '\u00a0') : null)}</p>
+      <p className="gi-reserved__body">{t.reservedBody}</p>
+      {pass && pass.accesses.length > 0 && (
+        <ul className="gi-reserved__list" aria-label={t.passIncludes}>
+          {pass.accesses.map((a) => (
+            <li key={a}><Check aria-hidden />{a}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -262,7 +364,7 @@ function RsvpForm({ choice, view, token, preview, onCancel, onDone, onStale }: {
         note: note.trim() || null,
         marketingConsent: e.marketing_consent_text && consent !== c.marketing_consent ? consent : null,
       });
-      toast.success(accept ? t.toastAccepted : t.toastDeclined);
+      toast.success(!accept ? t.toastDeclined : guestPhase(v.invitation) === 'awaiting_approval' ? t.toastAcceptedPending : t.toastAccepted);
       onDone(v);
     } catch (err) {
       const message = errorText(t, err);

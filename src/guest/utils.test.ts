@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  accentPalette, calendarUid, cleanAnswers, contrast, dayKey, differentTimeZone, eventIsPast, eventTimes, groupCode, initialAnswers,
-  mapsUrl, parseInvitationInput, safeUrl, validateRsvp,
+  accentPalette, calendarUid, cleanAnswers, contrast, dayKey, differentTimeZone, eventIsPast, eventTimes, groupCode, guestPhase,
+  initialAnswers, mapsUrl, parseInvitationInput, reservedPass, safeUrl, validateRsvp,
 } from './utils';
-import type { RsvpField } from '../lib/api/types';
+import { guestStatusKey } from './i18n';
+import type { ApprovalStatus, GuestView, InvitationStatus, RsvpField } from '../lib/api/types';
 // Só no teste: garante que o bilhete e a porta mostram o código da mesma forma.
 import { formatCode } from '../admin/checkin/code';
 
@@ -176,5 +177,50 @@ describe('formulário de resposta', () => {
       mesa: 'req', termos: 'check', 'companion-1': 'comp',
     });
     expect(validateRsvp(fields, { mesa: 'A', termos: true }, [], msgs)).toEqual({});
+  });
+});
+
+describe('aprovação pela equipa', () => {
+  const VIP: NonNullable<GuestView['invitation']['pass_type']> = {
+    name: 'VIP Pass', description: null, accesses: ['VIP Gala Dinner', 'ion Conference'], color: '#ccff00',
+  };
+  const inv = (status: InvitationStatus, approval_status: ApprovalStatus, extra: Partial<GuestView['invitation']> = {}) => ({
+    status, approval_status, checkin_code: null, pass_type: null, checked_in_at: null, ...extra,
+  });
+
+  it('guestPhase: só há credencial com presença confirmada e aprovada', () => {
+    expect(guestPhase(inv('accepted', 'pending'))).toBe('awaiting_approval');
+    expect(guestPhase(inv('accepted', 'approved', { checkin_code: 'V54BGGQFFT' }))).toBe('approved');
+    // Aprovado sem código (não devia acontecer): continua sem credencial.
+    expect(guestPhase(inv('accepted', 'approved'))).toBe('awaiting_approval');
+    expect(guestPhase(inv('accepted', 'rejected'))).toBe('rejected');
+    expect(guestPhase(inv('opened', 'rejected'))).toBe('rejected');
+    expect(guestPhase(inv('sent', 'approved'))).toBe('unanswered');
+    expect(guestPhase(inv('opened', 'pending'))).toBe('unanswered');
+    // A recusa do convidado prevalece sobre a decisão da equipa.
+    expect(guestPhase(inv('declined', 'rejected'))).toBe('declined');
+    expect(guestPhase(inv('declined', 'approved'))).toBe('declined');
+  });
+
+  it('reservedPass: acesso reservado antes de o convidado confirmar', () => {
+    expect(reservedPass(inv('sent', 'approved', { pass_type: VIP }))).toEqual(VIP);
+    expect(reservedPass(inv('opened', 'approved'))).toBeNull();
+    expect(reservedPass(inv('declined', 'approved', { pass_type: VIP }))).toEqual(VIP);
+    expect(reservedPass(inv('accepted', 'approved', { pass_type: VIP }))).toBeUndefined();
+    expect(reservedPass(inv('opened', 'pending'))).toBeUndefined();
+    expect(reservedPass(inv('opened', 'rejected'))).toBeUndefined();
+  });
+
+  it('guestStatusKey: estado na lista "Os meus convites"', () => {
+    expect(guestStatusKey(inv('accepted', 'pending'), true)).toBe('awaitingApproval');
+    expect(guestStatusKey(inv('accepted', 'approved'), true)).toBe('accepted');
+    expect(guestStatusKey(inv('accepted', 'rejected'), true)).toBe('notConfirmed');
+    expect(guestStatusKey(inv('opened', 'rejected'), true)).toBe('notConfirmed');
+    expect(guestStatusKey(inv('declined', 'rejected'), true)).toBe('declined');
+    expect(guestStatusKey(inv('opened', 'approved'), true)).toBe('pending');
+    expect(guestStatusKey(inv('opened', 'pending'), false)).toBe('closed');
+    expect(guestStatusKey(inv('accepted', 'approved', { checked_in_at: '2027-03-22T19:10:00Z' }), false)).toBe('checkedIn');
+    // Sem estado de aprovação (dados antigos): como antes.
+    expect(guestStatusKey({ status: 'accepted', checked_in_at: null }, true)).toBe('accepted');
   });
 });

@@ -3,7 +3,7 @@
 
 import { createContext, useContext } from 'react';
 import type { ApiErrorCode } from '../lib/api/errors';
-import type { InvitationStatus, Language } from '../lib/api/types';
+import type { ApprovalStatus, InvitationStatus, Language } from '../lib/api/types';
 
 export type GuestErrorCode = Extract<ApiErrorCode,
   'not_found' | 'rsvp_closed' | 'capacity_full' | 'too_many_companions' | 'invalid_companions'
@@ -41,6 +41,10 @@ const pt = {
   rsvpDeadline: (date: string) => `Agradecemos a sua resposta até ${date}.`,
   accept: 'Confirmo a minha presença',
   decline: 'Não poderei estar presente',
+  approvalNote: 'A presença fica sujeita a aprovação: depois da sua resposta, a equipa da ion indicará o seu tipo de acesso e a credencial com o código QR ficará disponível nesta página.',
+  reservedEyebrow: 'Acesso reservado',
+  reservedTitle: (pass: string | null) => (pass ? `O seu acesso ${pass} já está reservado` : 'O seu lugar já está reservado'),
+  reservedBody: 'Confirme a sua presença para receber a credencial com o código QR.',
   acceptFormTitle: 'Confirmação de presença',
   declineFormTitle: 'Não poderei estar presente',
   declineFormIntro: 'Se o desejar, deixe uma mensagem à organização.',
@@ -68,6 +72,7 @@ const pt = {
   // Depois de responder
   acceptedTitle: 'Presença confirmada',
   acceptedBody: 'Muito obrigado. A sua presença está confirmada; será um gosto recebê-lo(a).',
+  approvedBody: (pass: string) => `Muito obrigado. A sua presença está confirmada e o seu acesso ${pass} foi aprovado; será um gosto recebê-lo(a).`,
   acceptedPastBody: 'A sua presença foi confirmada.',
   attendedBody: 'Agradecemos a sua presença.',
   declinedTitle: 'Resposta registada',
@@ -81,6 +86,7 @@ const pt = {
   yesValue: 'Sim',
   noValue: 'Não',
   toastAccepted: 'A sua presença ficou confirmada.',
+  toastAcceptedPending: 'A sua presença ficou confirmada e aguarda agora a aprovação da equipa.',
   toastDeclined: 'A sua resposta foi registada.',
   closedTitle: 'Respostas encerradas',
   closedBody: 'O prazo de resposta a este convite terminou. Para qualquer questão, contacte a organização.',
@@ -88,6 +94,23 @@ const pt = {
   pastBody: 'Agradecemos o seu interesse.',
   checkedIn: (time: string) => `Entrada registada às ${time}. Seja bem-vindo(a).`,
   checkedInPast: (date: string, time: string) => `Entrada registada a ${date}, às ${time}.`,
+
+  // Aprovação pela equipa
+  awaitingTitle: 'Presença confirmada',
+  awaitingStatus: 'A aguardar aprovação',
+  awaitingBody: 'Obrigado pela sua resposta. A equipa da ion irá confirmar o seu tipo de acesso. Assim que o fizer, a sua credencial com o código QR ficará disponível nesta página e receberá uma notificação.',
+  stepsLabel: 'Próximos passos',
+  stepConfirmed: 'Presença confirmada',
+  stepApproval: 'Aprovação pela equipa da ion',
+  stepApprovalNow: 'Em análise',
+  stepCredential: 'Credencial com código QR',
+  stepCredentialHint: 'Ficará disponível nesta página',
+  stepDone: 'Concluído',
+  stepCurrent: 'Em curso',
+  stepNext: 'A seguir',
+  rejectedTitle: 'Presença não confirmada',
+  rejectedBody: 'Não foi possível confirmar a sua presença neste evento. Agradecemos sinceramente o seu interesse e a sua compreensão.',
+  rejectedContacts: 'Para qualquer esclarecimento, a organização está ao seu dispor:',
 
   errors: {
     not_found: 'Este convite já não está disponível.',
@@ -111,6 +134,8 @@ const pt = {
   ticketGuest: 'Convidado(a)',
   ticketCompanions: 'Acompanhantes',
   ticketWhere: 'Local',
+  passLabel: 'Tipo de acesso',
+  passIncludes: 'Inclui',
   qrLabel: (code: string) => `Código QR de acesso ${code}`,
   addToCalendar: 'Adicionar ao calendário',
   googleCalendar: 'Google Calendar',
@@ -119,6 +144,10 @@ const pt = {
   calendarDescription: (host: string | null) => (host ? `${host} — convite pessoal.` : 'Convite pessoal.'),
   calendarLink: 'O seu convite',
   calendarError: 'Não foi possível criar o ficheiro de calendário.',
+  eventAppTitle: 'A app do evento',
+  eventAppBody: 'Programa, oradores e networking, com a sua credencial sempre à mão.',
+  eventAppOpen: 'Abrir a app do evento',
+  eventAppPreview: 'Pré-visualização: o convite não é guardado neste dispositivo.',
 
   // Programa
   programmeEyebrow: 'Programa',
@@ -176,6 +205,8 @@ const pt = {
   guestStatus: {
     pending: 'Aguarda a sua resposta',
     accepted: 'Presença confirmada',
+    awaitingApproval: 'Aguarda aprovação',
+    notConfirmed: 'Presença não confirmada',
     declined: 'Não vai estar presente',
     closed: 'Respostas encerradas',
     checkedIn: 'Entrada registada',
@@ -214,6 +245,10 @@ const en: GuestStrings = {
   rsvpDeadline: (date) => `Kindly reply by ${date}.`,
   accept: 'I will attend',
   decline: 'I will not be able to attend',
+  approvalNote: 'Attendance is subject to approval: once you reply, the ion team will assign your access type and your credential with the QR code will become available on this page.',
+  reservedEyebrow: 'Access reserved',
+  reservedTitle: (pass) => (pass ? `Your ${pass} access is reserved` : 'Your place is reserved'),
+  reservedBody: 'Please confirm your attendance to receive your credential with the QR code.',
   acceptFormTitle: 'Confirm attendance',
   declineFormTitle: 'I will not be able to attend',
   declineFormIntro: 'If you wish, you may leave a message for the organisers.',
@@ -240,6 +275,7 @@ const en: GuestStrings = {
 
   acceptedTitle: 'Attendance confirmed',
   acceptedBody: 'Thank you. Your attendance is confirmed and we look forward to welcoming you.',
+  approvedBody: (pass) => `Thank you. Your attendance is confirmed and your ${pass} access has been approved; we look forward to welcoming you.`,
   acceptedPastBody: 'Your attendance was confirmed.',
   attendedBody: 'Thank you for joining us.',
   declinedTitle: 'Reply received',
@@ -253,6 +289,7 @@ const en: GuestStrings = {
   yesValue: 'Yes',
   noValue: 'No',
   toastAccepted: 'Your attendance has been confirmed.',
+  toastAcceptedPending: 'Your attendance has been confirmed and is now awaiting approval.',
   toastDeclined: 'Your reply has been received.',
   closedTitle: 'Replies are closed',
   closedBody: 'The deadline to reply to this invitation has passed. For any questions, please contact the organisers.',
@@ -260,6 +297,22 @@ const en: GuestStrings = {
   pastBody: 'Thank you for your interest.',
   checkedIn: (time) => `Checked in at ${time}. Welcome.`,
   checkedInPast: (date, time) => `Checked in on ${date} at ${time}.`,
+
+  awaitingTitle: 'Attendance confirmed',
+  awaitingStatus: 'Awaiting approval',
+  awaitingBody: 'Thank you for your reply. The ion team will now confirm your access type. Once they do, your credential with the QR code will be available on this page and you will be notified.',
+  stepsLabel: 'Next steps',
+  stepConfirmed: 'Attendance confirmed',
+  stepApproval: 'Approval by the ion team',
+  stepApprovalNow: 'Under review',
+  stepCredential: 'Credential with QR code',
+  stepCredentialHint: 'Will be available on this page',
+  stepDone: 'Done',
+  stepCurrent: 'In progress',
+  stepNext: 'Next',
+  rejectedTitle: 'Attendance not confirmed',
+  rejectedBody: 'We regret that we are unable to confirm your attendance at this event. Thank you sincerely for your interest and understanding.',
+  rejectedContacts: 'Should you have any questions, the organisers will be glad to help:',
 
   errors: {
     not_found: 'This invitation is no longer available.',
@@ -282,6 +335,8 @@ const en: GuestStrings = {
   ticketGuest: 'Guest',
   ticketCompanions: 'Accompanied by',
   ticketWhere: 'Venue',
+  passLabel: 'Access type',
+  passIncludes: 'Includes',
   qrLabel: (code) => `Access QR code ${code}`,
   addToCalendar: 'Add to calendar',
   googleCalendar: 'Google Calendar',
@@ -289,6 +344,10 @@ const en: GuestStrings = {
   calendarDescription: (host) => (host ? `Personal invitation — ${host}.` : 'Personal invitation.'),
   calendarLink: 'Your invitation',
   calendarError: 'We could not create the calendar file.',
+  eventAppTitle: 'The event app',
+  eventAppBody: 'Programme, speakers and networking, with your credential always at hand.',
+  eventAppOpen: 'Open the event app',
+  eventAppPreview: 'Preview: the invitation is not saved on this device.',
 
   programmeEyebrow: 'Programme',
   programmeTitle: 'Programme',
@@ -342,6 +401,8 @@ const en: GuestStrings = {
   guestStatus: {
     pending: 'Awaiting your reply',
     accepted: 'Attendance confirmed',
+    awaitingApproval: 'Awaiting approval',
+    notConfirmed: 'Not confirmed',
     declined: 'Not attending',
     closed: 'Replies closed',
     checkedIn: 'Checked in',
@@ -367,11 +428,16 @@ export function deviceLanguage(): Language {
 /** Estado do convite, do ponto de vista do convidado. */
 export type GuestStatusKey = keyof GuestStrings['guestStatus'];
 
-export function guestStatusKey(v: { status: InvitationStatus; checked_in_at: string | null }, rsvpOpen: boolean): GuestStatusKey {
+export function guestStatusKey(
+  v: { status: InvitationStatus; checked_in_at: string | null; approval_status?: ApprovalStatus },
+  rsvpOpen: boolean,
+): GuestStatusKey {
   if (v.checked_in_at) return 'checkedIn';
-  if (v.status === 'accepted') return 'accepted';
   if (v.status === 'declined') return 'declined';
   if (v.status === 'cancelled') return 'unavailable';
+  // A recusa da equipa prevalece sobre o resto; quem confirmou só tem credencial depois de aprovado.
+  if (v.approval_status === 'rejected') return 'notConfirmed';
+  if (v.status === 'accepted') return v.approval_status === 'pending' ? 'awaitingApproval' : 'accepted';
   return rsvpOpen ? 'pending' : 'closed';
 }
 

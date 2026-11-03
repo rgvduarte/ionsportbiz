@@ -11,10 +11,11 @@ import { GuestI18n, guestStrings } from './i18n';
 import { InfoSection, PrivacyFooter } from './InfoSection';
 import { InvitationCard } from './InvitationCard';
 import { LanguageToggle } from './LanguageToggle';
-import { accentStyle, InvitationSkeleton, StateMessage } from './parts';
+import { accentStyle, eventTheme, InvitationSkeleton, StateMessage } from './parts';
 import { ProgrammeSection } from './ProgrammeSection';
 import { RsvpSection } from './RsvpSection';
 import { TicketSection } from './TicketSection';
+import { guestPhase } from './utils';
 import './guest.css';
 import { useLightTheme } from './useLightTheme';
 
@@ -33,7 +34,7 @@ export function GuestInvitationPage() {
   const lang = chosenLang ?? 'pt';
   const t = guestStrings(lang);
   const accent = view?.event.branding?.accent;
-  const theme = view?.event.branding?.theme === 'dark' ? 'dark' : 'light';
+  const theme = view ? eventTheme(view.event) : 'light';
   const style = useMemo(() => accentStyle(accent, theme), [accent, theme]);
   useLightTheme(theme === 'light');
 
@@ -62,11 +63,14 @@ export function GuestInvitationPage() {
     return () => { document.title = previous; };
   }, [eventName, t]);
 
-  // Na app, o convite aberto fica em "Os meus convites".
+  // Na app, o convite aberto fica em "Os meus convites". Com a presença aprovada fica também guardado
+  // no browser, para a app do evento ("/") encontrar a credencial neste dispositivo.
+  // Na pré-visualização da equipa nada se guarda (o convite não é de quem o está a ver).
+  const approved = !!view && guestPhase(view.invitation) === 'approved';
   useEffect(() => {
-    if (!isNative || preview || !view) return;
+    if (preview || !view || !(isNative || approved)) return;
     void savedInvitations.add({ token, eventName: view.event.name, startsAt: view.event.starts_at, timezone: view.event.timezone });
-  }, [view, token, preview]);
+  }, [view, token, preview, approved]);
 
   let content;
   if (!view && loading) {
@@ -96,7 +100,7 @@ export function GuestInvitationPage() {
       <>
         <InvitationCard view={view} />
         <RsvpSection view={view} token={token} preview={preview} onUpdated={setData} onStale={reload} />
-        <TicketSection view={view} token={token} />
+        <TicketSection view={view} token={token} preview={preview} />
         <ProgrammeSection view={view} />
         <InfoSection view={view} />
       </>

@@ -246,3 +246,33 @@ export function validateRsvp(
   });
   return errors;
 }
+
+// ───────── Aprovação pela equipa ─────────
+
+/**
+ * Fase do convite do ponto de vista do convidado:
+ * - unanswered: ainda não respondeu (pode já ter um acesso reservado pela equipa);
+ * - declined: indicou que não vai;
+ * - awaiting_approval: confirmou e aguarda a aprovação da equipa (ainda sem credencial);
+ * - approved: confirmou e foi aprovado (tem credencial com código QR);
+ * - rejected: a equipa não pôde confirmar a presença.
+ * A recusa do próprio convidado prevalece: quem disse que não vai não precisa de saber da decisão da equipa.
+ */
+export type GuestPhase = 'unanswered' | 'declined' | 'awaiting_approval' | 'approved' | 'rejected';
+
+export function guestPhase(inv: Pick<GuestView['invitation'], 'status' | 'approval_status' | 'checkin_code'>): GuestPhase {
+  if (inv.status === 'declined') return 'declined';
+  if (inv.approval_status === 'rejected') return 'rejected';
+  if (inv.status !== 'accepted') return 'unanswered';
+  return inv.approval_status === 'approved' && inv.checkin_code ? 'approved' : 'awaiting_approval';
+}
+
+/**
+ * Acesso já reservado pela equipa antes da resposta (convidados aprovados de antemão).
+ * Devolve o tipo de acesso (ou null se a equipa aprovou sem tipo) quando ainda falta confirmar presença;
+ * undefined quando não há reserva.
+ */
+export function reservedPass(inv: Pick<GuestView['invitation'], 'status' | 'approval_status' | 'pass_type'>): GuestView['invitation']['pass_type'] | undefined {
+  if (inv.approval_status !== 'approved' || inv.status === 'accepted') return undefined;
+  return inv.pass_type ?? null;
+}

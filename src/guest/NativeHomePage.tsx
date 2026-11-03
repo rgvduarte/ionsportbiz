@@ -11,7 +11,7 @@ import {
   deviceLanguage, errorText, GuestI18n, guestStatusKey, guestStrings, useGuestStrings, type GuestStatusKey, type GuestStrings,
 } from './i18n';
 import { LanguageToggle } from './LanguageToggle';
-import { accentStyle } from './parts';
+import { accentStyle, passStyle } from './parts';
 import { capitalize, eventIsPast, parseInvitationInput } from './utils';
 import './guest.css';
 import { useLightTheme } from './useLightTheme';
@@ -35,6 +35,8 @@ interface Row extends SavedInvitation {
 const STATUS_TONE: Record<GuestStatusKey, Tone> = {
   pending: 'gold',
   accepted: 'success',
+  awaitingApproval: 'gold',
+  notConfirmed: 'neutral',
   declined: 'neutral',
   closed: 'neutral',
   checkedIn: 'success',
@@ -192,7 +194,9 @@ function Item({ row, onRemove, isPast }: { row: Row; onRemove: (r: Row) => void;
   const v = row.view;
   const status: GuestStatusKey | null = row.state === 'unavailable'
     ? 'unavailable'
-    : v ? guestStatusKey({ status: v.invitation.status, checked_in_at: v.invitation.checked_in_at }, v.event.rsvp_open) : null;
+    : v ? guestStatusKey(v.invitation, v.event.rsvp_open) : null;
+  // Tipo de acesso aprovado (VIP, Conferência…), ao lado do estado.
+  const pass = v && status !== 'notConfirmed' && status !== 'declined' ? v.invitation.pass_type : null;
 
   return (
     <li className={['gn-item', isPast && 'gn-item--past'].filter(Boolean).join(' ')}>
@@ -207,7 +211,12 @@ function Item({ row, onRemove, isPast }: { row: Row; onRemove: (r: Row) => void;
           <span className="gn-item__when">{when}</span>
           <span className="gn-item__status">
             {status ? (
-              <Badge tone={STATUS_TONE[status]} dot>{t.guestStatus[status]}</Badge>
+              <>
+                <Badge tone={STATUS_TONE[status]} dot>{t.guestStatus[status]}</Badge>
+                {pass && (
+                  <span className="gn-item__pass" style={passStyle(pass.color, null, 'dark')}>{pass.name}</span>
+                )}
+              </>
             ) : row.state === 'loading' ? (
               <span className="ui-skeleton" style={{ display: 'inline-block', width: 120, height: 20, borderRadius: 999 }} />
             ) : null}

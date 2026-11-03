@@ -16,6 +16,30 @@ function formatPhone(phone: string): string {
   }
 }
 
+/** Email e telefone da organização, como links (também usados na mensagem de presença não confirmada). */
+export function ContactLinks({ event: e, className }: { event: Pick<GuestView['event'], 'contact_email' | 'contact_phone'>; className?: string }) {
+  const t = useGuestStrings();
+  if (!e.contact_email && !e.contact_phone) return null;
+  return (
+    <ul className={['gi-info__contacts', className].filter(Boolean).join(' ')}>
+      {e.contact_email && (
+        <li>
+          <a className="gi-info__link" href={`mailto:${e.contact_email}`}>
+            <Mail aria-hidden /><span className="visually-hidden">{t.email}: </span>{e.contact_email}
+          </a>
+        </li>
+      )}
+      {e.contact_phone && (
+        <li>
+          <a className="gi-info__link" href={`tel:${e.contact_phone.replace(/[^\d+]/g, '')}`}>
+            <Phone aria-hidden /><span className="visually-hidden">{t.phone}: </span>{formatPhone(e.contact_phone)}
+          </a>
+        </li>
+      )}
+    </ul>
+  );
+}
+
 /** Descrição do evento e contactos da organização. */
 export function InfoSection({ view }: { view: GuestView }) {
   const t = useGuestStrings();
@@ -36,22 +60,7 @@ export function InfoSection({ view }: { view: GuestView }) {
           <div className="gi-info__block">
             <h3 className="gi-info__label">{t.contactsTitle}</h3>
             <p className="gi-info__text gi-info__muted">{t.contactsIntro}</p>
-            <ul className="gi-info__contacts">
-              {e.contact_email && (
-                <li>
-                  <a className="gi-info__link" href={`mailto:${e.contact_email}`}>
-                    <Mail aria-hidden /><span className="visually-hidden">{t.email}: </span>{e.contact_email}
-                  </a>
-                </li>
-              )}
-              {e.contact_phone && (
-                <li>
-                  <a className="gi-info__link" href={`tel:${e.contact_phone.replace(/[^\d+]/g, '')}`}>
-                    <Phone aria-hidden /><span className="visually-hidden">{t.phone}: </span>{formatPhone(e.contact_phone)}
-                  </a>
-                </li>
-              )}
-            </ul>
+            <ContactLinks event={e} />
           </div>
         )}
       </div>

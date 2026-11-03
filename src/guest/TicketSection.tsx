@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, CalendarPlus, CheckCircle2, Navigation } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { CalendarDays, CalendarPlus, Check, CheckCircle2, Navigation, Smartphone } from 'lucide-react';
 import type { GuestView } from '../lib/api/types';
 import { inviteUrl } from '../lib/config';
 import { formalName, formatDate, formatTime } from '../lib/format';
 import { buildIcs, canDownloadIcs, downloadIcs, googleCalendarUrl, icsFilename, type CalendarEvent } from '../lib/ics';
+import { savedInvitations } from '../native/savedInvitations';
 import { Button, ButtonAnchor, useToast } from '../ui';
 import { useGuestStrings } from './i18n';
 import { QrCode } from './QrCode';
-import { Section } from './parts';
+import { eventTheme, passStyle, Section } from './parts';
 import { calendarUid, eventIsPast, eventTimes, groupCode, mapsUrl } from './utils';
 
-/** "O seu acesso": bilhete com o código QR, só depois de confirmar presença. */
-export function TicketSection({ view, token }: { view: GuestView; token: string }) {
+/**
+ * "O seu acesso": bilhete com o código QR e o tipo de acesso. Só existe com presença confirmada
+ * e aprovada pela equipa (o código QR só chega nessa altura).
+ */
+export function TicketSection({ view, token, preview }: { view: GuestView; token: string; preview: boolean }) {
   const t = useGuestStrings();
   const toast = useToast();
+  const navigate = useNavigate();
   // Calculado de antemão: na app, a partilha do sistema tem de abrir logo a seguir ao toque.
   const [uid, setUid] = useState<{ token: string; value: string } | null>(null);
   useEffect(() => {
@@ -23,8 +29,10 @@ export function TicketSection({ view, token }: { view: GuestView; token: string 
   }, [token]);
   const { invitation: inv, contact: c, event: e } = view;
   const code = inv.checkin_code;
-  if (inv.status !== 'accepted' || !code) return null;
+  if (inv.status !== 'accepted' || inv.approval_status !== 'approved' || !code) return null;
   const past = eventIsPast(e);
+  const pass = inv.pass_type;
+  const role = [c.job_title, c.organization].filter(Boolean).join(' · ');
 
   const { date, start, end } = eventTimes(e, t.locale);
   const checkedIn = inv.checked_in_at
@@ -59,9 +67,19 @@ export function TicketSection({ view, token }: { view: GuestView; token: string 
     }
   };
 
+  // Guarda o convite neste dispositivo e abre a app do evento ("/"), que o lê para mostrar a credencial.
+  const openEventApp = async () => {
+    if (preview) {
+      toast.info(t.eventAppPreview);
+      return;
+    }
+    await savedInvitations.add({ token, eventName: e.name, startsAt: e.starts_at, timezone: e.timezone });
+    navigate('/');
+  };
+
   return (
     <Section id="gi-ticket" eyebrow={t.ticketEyebrow} title={t.ticketTitle} intro={past ? undefined : t.ticketIntro}>
-      <div className="gi-ticket">
+      <div className={['gi-ticket', pass && 'gi-ticket--pass'].filter(Boolean).join(' ')} style={pass ? passStyle(pass.color, e.branding?.accent, eventTheme(e)) : undefined}>
         <div className="gi-ticket__head">
           <p className="gi-ticket__event">{e.name}</p>
           <p className="gi-ticket__when">
@@ -86,11 +104,38 @@ export function TicketSection({ view, token }: { view: GuestView; token: string 
           </p>
           {!past && <p className="gi-ticket__hint">{t.ticketHint}</p>}
         </div>
+        {pass && (
+          <p className="gi-ticket__pass">
+            <span className="gi-ticket__pass-label">{t.passLabel}</span>
+            <span className="gi-ticket__pass-name">{pass.name}</span>
+          </p>
+        )}
         <div className="gi-ticket__tear" aria-hidden />
+        {pass && (pass.accesses.length > 0 || pass.description) && (
+          <div className="gi-ticket__includes">
+            {pass.accesses.length > 0 && (
+              <>
+                <h3 className="gi-ticket__label" id="gi-ticket-includes">{t.passIncludes}</h3>
+                <ul className="gi-access" aria-labelledby="gi-ticket-includes">
+                  {pass.accesses.map((a) => (
+                    <li key={a} className="gi-access__item">
+                      <span className="gi-access__check" aria-hidden><Check /></span>
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {pass.description && <p className="gi-ticket__pass-desc">{pass.description}</p>}
+          </div>
+        )}
         <dl className="gi-ticket__meta">
           <div>
             <dt>{t.ticketGuest}</dt>
-            <dd>{formalName(c)}</dd>
+            <dd>
+              <span className="gi-ticket__name">{formalName(c)}</span>
+              {role && <span className="gi-ticket__role">{role}</span>}
+            </dd>
           </div>
           {inv.companions.length > 0 && (
             <div>
@@ -108,6 +153,15 @@ export function TicketSection({ view, token }: { view: GuestView; token: string 
             </div>
           )}
         </dl>
+      </div>
+
+      <div className="gi-appcta">
+        <span className="gi-appcta__icon" aria-hidden><Smartphone /></span>
+        <div className="gi-appcta__text">
+          <p className="gi-appcta__title">{t.eventAppTitle}</p>
+          <p className="gi-appcta__body">{t.eventAppBody}</p>
+        </div>
+        <Button variant="primary" size="lg" className="gi-btn-primary gi-appcta__btn" onClick={openEventApp}>{t.eventAppOpen}</Button>
       </div>
 
       {!past && (
