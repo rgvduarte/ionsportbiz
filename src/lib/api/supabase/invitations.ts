@@ -47,6 +47,7 @@ export const invitations: Api['invitations'] = {
       let query = supabase.from('invitation_overview').select('*').eq('event_id', eventId);
       if (q?.status) query = query.eq('status', q.status);
       if (q?.wave) query = query.eq('wave', q.wave);
+      if (q?.approval) query = query.eq('approval_status', q.approval);
       // Cada palavra tem de aparecer num dos campos.
       for (const word of words) {
         const term = ilikeTerm(word);
@@ -141,6 +142,18 @@ export const invitations: Api['invitations'] = {
     const rows = await readAll<{ wave: string }>((from, to) =>
       supabase.from('invitations').select('wave').eq('event_id', eventId).not('wave', 'is', null).order('wave').order('id').range(from, to));
     return [...new Set(rows.map((r) => r.wave))].sort(collator.compare);
+  },
+
+  async approve(ids, passTypeId) {
+    return must(await supabase.rpc('approve_invitations', { p_invitation_ids: ids, p_pass_type_id: passTypeId })) as number;
+  },
+
+  async reject(ids, reason) {
+    return must(await supabase.rpc('reject_invitations', { p_invitation_ids: ids, p_reason: reason?.trim() || null })) as number;
+  },
+
+  async resetApproval(ids) {
+    return must(await supabase.rpc('reset_approval', { p_invitation_ids: ids })) as number;
   },
 
   async activities(eventId, limit = 50) {

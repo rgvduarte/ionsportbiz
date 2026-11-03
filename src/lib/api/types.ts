@@ -8,6 +8,8 @@ export type EventStatus = 'draft' | 'open' | 'closed' | 'archived';
 export type InvitationStatus = 'draft' | 'sent' | 'opened' | 'accepted' | 'declined' | 'cancelled';
 export type Channel = 'email' | 'whatsapp' | 'sms' | 'manual' | 'link';
 export type Language = 'pt' | 'en';
+/** Decisão da equipa sobre a presença (o convidado só recebe o QR quando aprovado). */
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Staff {
   user_id: string;
@@ -64,9 +66,27 @@ export interface EventRecord {
   privacy_controller: string | null;
   privacy_policy_url: string | null;
   marketing_consent_text: string | null;
+  /** true: quem confirma fica "por aprovar" até a equipa aprovar e escolher o tipo de acesso. */
+  requires_approval: boolean;
   created_at: string;
   updated_at: string;
 }
+
+/** Tipo de acesso definido pela equipa (ex.: VIP Pass, Conference Pass). */
+export interface PassType {
+  id: string;
+  event_id: string;
+  name: string;
+  description: string | null;
+  /** O que inclui, pela ordem a mostrar (ex.: VIP Gala Dinner, ion Conference). */
+  accesses: string[];
+  /** #rrggbb */
+  color: string | null;
+  sort: number;
+  created_at: string;
+}
+
+export type PassTypeInput = Omit<PassType, 'id' | 'created_at'> & { id?: string };
 
 export type EventInput = Omit<EventRecord, 'id' | 'created_at' | 'updated_at'>;
 
@@ -150,6 +170,10 @@ export interface Invitation {
   guest_note: string | null;
   checked_in_at: string | null;
   checked_in_by: string | null;
+  approval_status: ApprovalStatus;
+  pass_type_id: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -169,6 +193,8 @@ export interface InvitationRow extends Invitation {
   marketing_consent: boolean;
   companions_count: number;
   companions_checked_in: number;
+  pass_type_name: string | null;
+  pass_type_color: string | null;
 }
 
 export interface Companion {
@@ -181,6 +207,7 @@ export interface Companion {
 
 export interface InvitationQuery {
   status?: InvitationStatus;
+  approval?: ApprovalStatus;
   wave?: string;
   search?: string;
 }
@@ -225,6 +252,10 @@ export interface EventStats {
   expected_attendees: number;
   checked_in: number;
   capacity: number | null;
+  /** Só conta quem confirmou presença. */
+  approval: Record<ApprovalStatus, number>;
+  /** Aprovados com presença confirmada, por tipo de acesso (attendees inclui acompanhantes). */
+  by_pass_type: { pass_type_id: string; name: string; color: string | null; sort: number; approved: number; attendees: number }[];
   by_wave: (BreakdownRow & { wave: string })[];
   by_segment: (BreakdownRow & { segment: string })[];
 }
@@ -260,14 +291,19 @@ export interface GuestView {
     guest_note: string | null;
     responded_at: string | null;
     checked_in_at: string | null;
-    /** Só existe depois de confirmar presença. */
+    approval_status: ApprovalStatus;
+    /** Só existe com presença confirmada E aprovada pela equipa. */
     checkin_code: string | null;
+    /** Só existe depois de aprovado. */
+    pass_type: { name: string; description: string | null; accesses: string[]; color: string | null } | null;
     companions: { full_name: string }[];
   };
   contact: {
     salutation: string | null;
     first_name: string;
     last_name: string | null;
+    organization: string | null;
+    job_title: string | null;
     language: Language;
     marketing_consent: boolean;
   };
@@ -276,7 +312,7 @@ export interface GuestView {
     | 'name' | 'host_name' | 'invitation_text' | 'description' | 'starts_at' | 'ends_at' | 'timezone'
     | 'venue_name' | 'venue_address' | 'venue_maps_url' | 'dress_code' | 'contact_email' | 'contact_phone'
     | 'rsvp_deadline' | 'rsvp_fields' | 'branding' | 'status' | 'privacy_controller' | 'privacy_policy_url'
-    | 'marketing_consent_text'
+    | 'marketing_consent_text' | 'requires_approval'
   > & { rsvp_open: boolean };
   sessions: Omit<EventSession, 'event_id'>[];
 }
@@ -301,6 +337,9 @@ export interface CheckinRecord {
   organization: string | null;
   status: InvitationStatus;
   wave: string | null;
+  approval_status: ApprovalStatus;
+  /** Só quando aprovado. */
+  pass_type: { name: string; color: string | null; accesses: string[] } | null;
   plus_ones_allowed: number;
   checked_in_at: string | null;
   companions: { id: string; full_name: string; checked_in_at: string | null }[];
@@ -368,6 +407,17 @@ export interface Api {
     sendEmail(ids: string[], templateId: string): Promise<{ sent: number; failed: number }>;
     waves(eventId: string): Promise<string[]>;
     activities(eventId: string, limit?: number): Promise<Activity[]>;
+    /** Aprova com um tipo de acesso do mesmo evento. Devolve quantos mudaram. */
+    approve(ids: string[], passTypeId: string): Promise<number>;
+    reject(ids: string[], reason?: string | null): Promise<number>;
+    /** Volta a "por aprovar" (só quem ainda não entrou). */
+    resetApproval(ids: string[]): Promise<number>;
+  };
+
+  passTypes: {
+    list(eventId: string): Promise<PassType[]>;
+    save(input: PassTypeInput): Promise<PassType>;
+    remove(id: string): Promise<void>;
   };
 
   templates: {

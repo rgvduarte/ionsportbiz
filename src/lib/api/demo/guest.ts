@@ -37,7 +37,12 @@ function payload(inv: Invitation): GuestView {
       guest_note: inv.guest_note,
       responded_at: inv.responded_at,
       checked_in_at: inv.checked_in_at,
-      checkin_code: inv.status === 'accepted' ? inv.checkin_code : null,
+      approval_status: inv.approval_status,
+      checkin_code: inv.status === 'accepted' && inv.approval_status === 'approved' ? inv.checkin_code : null,
+      pass_type: (() => {
+        const p = inv.approval_status === 'approved' ? d.passTypes.find((x) => x.id === inv.pass_type_id) : undefined;
+        return p ? { name: p.name, description: p.description, accesses: [...p.accesses], color: p.color } : null;
+      })(),
       companions: d.companions
         .filter((m) => m.invitation_id === inv.id)
         .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -47,6 +52,8 @@ function payload(inv: Invitation): GuestView {
       salutation: c.salutation,
       first_name: c.first_name,
       last_name: c.last_name,
+      organization: c.organization,
+      job_title: c.job_title,
       language: c.language,
       marketing_consent: c.marketing_consent,
     },
@@ -71,6 +78,7 @@ function payload(inv: Invitation): GuestView {
       privacy_controller: e.privacy_controller,
       privacy_policy_url: e.privacy_policy_url,
       marketing_consent_text: e.marketing_consent_text,
+      requires_approval: e.requires_approval,
       rsvp_open: e.status === 'open' && (e.rsvp_deadline === null || now <= new Date(e.rsvp_deadline).getTime()),
     },
     sessions: d.sessions
@@ -142,7 +150,7 @@ export const guest: Api['guest'] = {
 
     if (accept && e.capacity !== null) {
       const taken = d.invitations
-        .filter((i) => i.event_id === e.id && i.status === 'accepted' && i.id !== inv.id)
+        .filter((i) => i.event_id === e.id && i.status === 'accepted' && i.approval_status !== 'rejected' && i.id !== inv.id)
         .reduce((n, i) => n + 1 + d.companions.filter((m) => m.invitation_id === i.id).length, 0);
       if (taken + 1 + names.length > e.capacity) throw new ApiError('capacity_full');
     }
@@ -150,6 +158,11 @@ export const guest: Api['guest'] = {
     const now = nowIso();
     setInvitationStatus(inv, accept ? 'accepted' : 'declined', null);
     inv.responded_at = now;
+    // Sem aprovação obrigatória, quem confirma fica aprovado. Com aprovação, a decisão é da equipa.
+    if (accept && !e.requires_approval && inv.approval_status === 'pending') {
+      inv.approval_status = 'approved';
+      inv.approved_at = now;
+    }
     inv.answers = accept ? structuredClone(answers) : {};
     inv.guest_note = note === null ? null : btrim(note) || null;
     inv.first_opened_at ??= now;

@@ -71,6 +71,7 @@ const routes: RouteObject[] = [
         children: [
           { index: true, ...page(async () => (await import('../admin/invitations/InvitationsPage')).InvitationsPage) },
           { path: 'programa', ...page(async () => (await import('../admin/events/ProgrammePage')).ProgrammePage) },
+          { path: 'acessos', ...page(async () => (await import('../admin/events/PassTypesPage')).PassTypesPage) },
           { path: 'mensagens', ...page(async () => (await import('../admin/invitations/TemplatesPage')).TemplatesPage) },
           { path: 'definicoes', ...page(async () => (await import('../admin/events/EventFormPage')).EventFormPage, EDIT) },
         ],

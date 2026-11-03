@@ -6,7 +6,7 @@ const EVENT_KEYS: (keyof EventInput)[] = [
   'slug', 'name', 'host_name', 'invitation_text', 'description', 'starts_at', 'ends_at', 'timezone',
   'venue_name', 'venue_address', 'venue_maps_url', 'dress_code', 'contact_email', 'contact_phone',
   'rsvp_deadline', 'capacity', 'default_plus_ones', 'status', 'rsvp_fields', 'branding',
-  'privacy_controller', 'privacy_policy_url', 'marketing_consent_text',
+  'privacy_controller', 'privacy_policy_url', 'marketing_consent_text', 'requires_approval',
 ];
 
 const ts = (iso: string) => new Date(iso).getTime();
@@ -79,9 +79,21 @@ export function computeEventStats(eventId: string): EventStats {
     delivered: count((i) => i.status !== 'draft'),
     opened: count((i) => i.first_opened_at !== null),
     responded: count((i) => i.status === 'accepted' || i.status === 'declined'),
-    expected_attendees: inv.filter((i) => i.status === 'accepted').reduce((n, i) => n + 1 + i.comp, 0),
+    expected_attendees: inv.filter((i) => i.status === 'accepted' && i.approval_status !== 'rejected').reduce((n, i) => n + 1 + i.comp, 0),
     checked_in: count((i) => i.checked_in_at !== null) + inv.reduce((n, i) => n + i.compIn, 0),
     capacity: d.events.find((e) => e.id === eventId)?.capacity ?? null,
+    approval: {
+      pending: count((i) => i.status === 'accepted' && i.approval_status === 'pending'),
+      approved: count((i) => i.status === 'accepted' && i.approval_status === 'approved'),
+      rejected: count((i) => i.status === 'accepted' && i.approval_status === 'rejected'),
+    },
+    by_pass_type: d.passTypes
+      .filter((p) => p.event_id === eventId)
+      .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
+      .map((p) => {
+        const rows = inv.filter((i) => i.pass_type_id === p.id && i.approval_status === 'approved' && i.status === 'accepted');
+        return { pass_type_id: p.id, name: p.name, color: p.color, sort: p.sort, approved: rows.length, attendees: rows.reduce((n, i) => n + 1 + i.comp, 0) };
+      }),
     by_wave: breakdown(inv.map((i) => ({ key: i.wave ?? '', status: i.status })), 'wave'),
     by_segment: breakdown(inv.map((i) => ({ key: i.segment ?? '', status: i.status })), 'segment'),
   };
@@ -110,6 +122,7 @@ export const events: Api['events'] = {
       timezone: 'Europe/Lisbon', venue_name: null, venue_address: null, venue_maps_url: null, dress_code: null,
       contact_email: null, contact_phone: null, rsvp_deadline: null, capacity: null, default_plus_ones: 0, status: 'draft',
       rsvp_fields: [], branding: {}, privacy_controller: null, privacy_policy_url: null, marketing_consent_text: null,
+      requires_approval: true,
     };
     const event: EventRecord = { ...defaults, ...pickEvent(input), id: uid(), created_at: now, updated_at: now };
     checkEvent(event);
@@ -140,6 +153,7 @@ export const events: Api['events'] = {
     d.events = d.events.filter((e) => e.id !== id);
     d.sessions = d.sessions.filter((s) => s.event_id !== id);
     d.templates = d.templates.filter((t) => t.event_id !== id);
+    d.passTypes = d.passTypes.filter((p) => p.event_id !== id);
     d.invitations = d.invitations.filter((i) => !invitationIds.has(i.id));
     d.companions = d.companions.filter((m) => !invitationIds.has(m.invitation_id));
     d.deliveries = d.deliveries.filter((x) => !invitationIds.has(x.invitation_id));

@@ -7,5 +7,6 @@ import { invitations } from './invitations';
 import { templates } from './templates';
 import { checkin } from './checkin';
 import { guest } from './guest';
+import { passTypes } from './passTypes';
 
-export const supabaseApi: Api = { mode: 'supabase', auth, staff, events, contacts, invitations, templates, checkin, guest };
+export const supabaseApi: Api = { mode: 'supabase', auth, staff, events, contacts, invitations, templates, checkin, guest, passTypes };

@@ -1,4 +1,4 @@
-import type { Channel, EventStatus, InvitationStatus, StaffRole } from './api/types';
+import type { ApprovalStatus, Channel, EventStatus, InvitationStatus, StaffRole } from './api/types';
 import type { Tone } from '../ui/Feedback';
 
 export const INVITATION_STATUS: Record<InvitationStatus, { label: string; tone: Tone }> = {
@@ -8,6 +8,13 @@ export const INVITATION_STATUS: Record<InvitationStatus, { label: string; tone: 
   accepted: { label: 'Confirmado', tone: 'success' },
   declined: { label: 'Recusado', tone: 'danger' },
   cancelled: { label: 'Cancelado', tone: 'neutral' },
+};
+
+/** Decisão da equipa sobre a presença (só conta para quem confirmou). */
+export const APPROVAL_STATUS: Record<ApprovalStatus, { label: string; tone: Tone }> = {
+  pending: { label: 'Por aprovar', tone: 'warning' },
+  approved: { label: 'Aprovado', tone: 'success' },
+  rejected: { label: 'Não aprovado', tone: 'danger' },
 };
 
 export const EVENT_STATUS: Record<EventStatus, { label: string; tone: Tone; hint: string }> = {
@@ -43,6 +50,9 @@ export const ACTIVITY: Record<string, string> = {
   'invitation.declined': 'Convite recusado',
   'invitation.cancelled': 'Convite cancelado',
   'invitation.reopened': 'Convite reaberto',
+  'invitation.approved': 'Presença aprovada',
+  'invitation.rejected': 'Presença não aprovada',
+  'invitation.approval_reset': 'Aprovação reposta (por aprovar)',
   checkin: 'Entrada registada',
   'checkin.undone': 'Entrada anulada',
   'consent.granted': 'Consentimento para comunicações dado',

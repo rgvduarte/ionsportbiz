@@ -17,14 +17,21 @@ cleanup() { "${as_pg[@]}" pg_ctl -D "$dir/data" -m immediate stop >/dev/null 2>&
 trap cleanup EXIT
 "${as_pg[@]}" initdb -D "$dir/data" -U postgres -A trust >/dev/null
 "${as_pg[@]}" pg_ctl -D "$dir/data" -o "-p $port -k $dir -c listen_addresses=''" -l "$dir/log" -w start >/dev/null
-psql_run() { psql -h "$dir" -p "$port" -U postgres -d postgres -X -q -v ON_ERROR_STOP=1 "$@"; }
-psql_run -f "$here/supabase_stub.sql"
-for f in "$root"/migrations/*.sql; do
-  echo "migração: $(basename "$f")"
-  psql_run -f "$f"
-done
+psql_db() { local db="$1"; shift; psql -h "$dir" -p "$port" -U postgres -d "$db" -X -q -v ON_ERROR_STOP=1 "$@"; }
+# Cada ficheiro de teste corre numa base de dados nova: os testes não dependem uns dos outros.
+setup_db() {
+  local db="$1"
+  psql_db postgres -c "create database $db" >/dev/null
+  psql_db "$db" -f "$here/supabase_stub.sql"
+  local m
+  for m in "$root"/migrations/*.sql; do psql_db "$db" -f "$m"; done
+}
+echo "migrações: $(cd "$root/migrations" && ls *.sql | tr '\n' ' ')"
 status=0
+n=0
 for f in "$here"/*.test.sql; do
-  if psql_run -f "$f" >/dev/null; then echo "ok   $(basename "$f")"; else echo "FALHOU $(basename "$f")"; status=1; fi
+  n=$((n + 1))
+  db="teste_$n"
+  if setup_db "$db" && psql_db "$db" -f "$f" >/dev/null; then echo "ok   $(basename "$f")"; else echo "FALHOU $(basename "$f")"; status=1; fi
 done
 exit $status

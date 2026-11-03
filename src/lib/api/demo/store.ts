@@ -4,6 +4,7 @@
 import type {
   Activity, Channel, Companion, Contact, EventRecord, EventSession, Invitation, InvitationStatus,
   MessageTemplate, Staff, StaffRole,
+PassType,
 } from '../types';
 import ionLogo from '../../../assets/brand/ion-logo.png';
 import { ApiError } from '../errors';
@@ -19,6 +20,7 @@ export interface DemoDb {
   sessions: EventSession[];
   contacts: Contact[];
   invitations: DemoInvitation[];
+  passTypes: PassType[];
   companions: Companion[];
   activities: Activity[];
   templates: MessageTemplate[];
@@ -26,7 +28,7 @@ export interface DemoDb {
 }
 
 // Muda quando os dados fictícios mudam, para a demonstração recomeçar com os novos.
-const KEY = 'convites-demo-v3';
+const KEY = 'convites-demo-v4';
 
 // ───────── Utilitários ─────────
 
@@ -272,6 +274,7 @@ function seed(): DemoDb {
       dress_code: 'Black tie (jantar de gala)',
       rsvp_deadline: iso(main.getTime() - 14 * day),
       capacity: 650,
+      requires_approval: true,
       default_plus_ones: 1,
       status: 'open',
       rsvp_fields: [
@@ -296,6 +299,7 @@ function seed(): DemoDb {
       dress_code: null,
       rsvp_deadline: null,
       capacity: 80,
+      requires_approval: false,
       default_plus_ones: 0,
       status: 'closed',
       rsvp_fields: [],
@@ -375,9 +379,24 @@ function seed(): DemoDb {
     version: 1,
     currentUserId: null,
     staff, events, sessions, contacts,
-    invitations: [], companions: [], activities: [], templates: [], deliveries: [],
+    invitations: [], passTypes: [], companions: [], activities: [], templates: [], deliveries: [],
   };
   db = d;
+
+  // Tipos de acesso do evento principal (definidos pela equipa; o convidado não escolhe).
+  const vip: PassType = {
+    id: '00000000-0000-4000-8000-0000000009a1', event_id: events[0].id, name: 'VIP Pass',
+    description: 'Acesso a todo o programa, incluindo o jantar de gala e o almoço VIP.',
+    accesses: ['VIP Gala Dinner', 'Cerimónia dos ion Awards', 'ion Conference (5 palcos)', 'VIP Lunch'],
+    color: '#ccff00', sort: 0, created_at: created,
+  };
+  const conference: PassType = {
+    id: '00000000-0000-4000-8000-0000000009a2', event_id: events[0].id, name: 'Conference Pass',
+    description: 'Acesso à ion Conference de 23 de março.',
+    accesses: ['ion Conference (5 palcos)', 'Zona de networking'],
+    color: '#e27a2c', sort: 1, created_at: created,
+  };
+  d.passTypes = [vip, conference];
 
   const companionNames = ['Paulo Reis', 'Cláudia Antunes', 'Jorge Matos', 'Sara Cunha', 'Vasco Brito', 'Laura Fontes'];
   const plan: InvitationStatus[] = [
@@ -409,6 +428,10 @@ function seed(): DemoDb {
       guest_note: null,
       checked_in_at: null,
       checked_in_by: null,
+      approval_status: 'pending',
+      pass_type_id: null,
+      approved_at: null,
+      approved_by: null,
       created_at: iso(createdAt),
       updated_at: iso(createdAt),
     };
@@ -438,6 +461,18 @@ function seed(): DemoDb {
         inv.checked_in_at = iso(new Date(event.starts_at).getTime() + Math.floor(rnd() * 3_600_000));
         inv.checked_in_by = staff[2].user_id;
       }
+    }
+    // Aprovação da equipa: convidados de honra aprovados como VIP (mesmo antes de responderem);
+    // os restantes que confirmaram ficam Conference ou por aprovar. Sem aprovação obrigatória, quem confirma fica aprovado.
+    const honor = wave === 'Convidados de honra';
+    if (!event.requires_approval) {
+      if (status === 'accepted') { inv.approval_status = 'approved'; inv.approved_at = inv.responded_at; }
+    } else if (status !== 'declined' && status !== 'cancelled' && status !== 'draft' && (honor || (status === 'accepted' && rnd() < 0.7))) {
+      const pass = honor ? vip : conference;
+      const at = (inv.responded_at ? new Date(inv.responded_at).getTime() : createdAt + 3 * day) + day;
+      Object.assign(inv, { approval_status: 'approved', pass_type_id: pass.id, approved_at: iso(at), approved_by: admin });
+      logActivity({ kind: 'invitation.approved', contact_id: contact.id, invitation_id: inv.id, event_id: event.id, channel: null,
+        detail: { pass_type: pass.name }, created_at: iso(at), actor_id: admin });
     }
     inv.updated_at = inv.responded_at ?? inv.sent_at ?? inv.created_at;
   };

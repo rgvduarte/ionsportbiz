@@ -41,6 +41,8 @@ function overview(inv: Invitation): InvitationRow | null {
     marketing_consent: c.marketing_consent,
     companions_count: comps.length,
     companions_checked_in: comps.filter((m) => m.checked_in_at).length,
+    pass_type_name: d.passTypes.find((p) => p.id === inv.pass_type_id)?.name ?? null,
+    pass_type_color: d.passTypes.find((p) => p.id === inv.pass_type_id)?.color ?? null,
   });
 }
 
@@ -83,13 +85,29 @@ function markSentRows(ids: string[], channel: Channel): number {
   return n;
 }
 
+/** Como approve_invitations / reject_invitations / reset_approval: só regista quem mudou. */
+function decide(ids: string[], apply: (inv: DemoInvitation) => boolean, kind: string, detail: Record<string, unknown> = {}): number {
+  const d = getDb();
+  const set = new Set(ids);
+  let n = 0;
+  for (const inv of d.invitations.filter((i) => set.has(i.id))) {
+    if (!apply(inv)) continue;
+    inv.updated_at = nowIso();
+    logActivity({ kind, contact_id: inv.contact_id, invitation_id: inv.id, event_id: inv.event_id, channel: null, detail });
+    n++;
+  }
+  save();
+  return n;
+}
+
 export const invitations: Api['invitations'] = {
   async list(eventId, q) {
     requireRole(...CAN_READ_CRM);
     // ilike: ignora maiúsculas, mas não acentos.
     const words = (q?.search ?? '').toLowerCase().split(/\s+/).filter(Boolean);
     const rows = getDb().invitations
-      .filter((i) => i.event_id === eventId && (!q?.status || i.status === q.status) && (!q?.wave || i.wave === q.wave))
+      .filter((i) => i.event_id === eventId && (!q?.status || i.status === q.status) && (!q?.wave || i.wave === q.wave)
+        && (!q?.approval || i.approval_status === q.approval))
       .map(overview)
       .filter((r): r is InvitationRow => r !== null)
       .filter((r) => words.every((w) => [r.first_name, r.last_name, r.email, r.organization].some((f) => (f ?? '').toLowerCase().includes(w))))
@@ -128,6 +146,7 @@ export const invitations: Api['invitations'] = {
         status: 'draft', wave, plus_ones_allowed: plusOnes, invited_by: me.user_id,
         sent_at: null, sent_channel: null, first_opened_at: null, last_opened_at: null, open_count: 0,
         responded_at: null, answers: {}, guest_note: null, checked_in_at: null, checked_in_by: null,
+        approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null,
         created_at: now, updated_at: now,
       };
       d.invitations.push(inv);
@@ -178,6 +197,42 @@ export const invitations: Api['invitations'] = {
     d.invitations = d.invitations.filter((i) => i.id !== id);
     save();
     await delay(null);
+  },
+
+  async approve(ids, passTypeId) {
+    const me = requireRole(...CAN_EDIT);
+    const d = getDb();
+    const pass = d.passTypes.find((p) => p.id === passTypeId);
+    if (!pass || d.invitations.some((i) => ids.includes(i.id) && i.event_id !== pass.event_id)) throw new ApiError('invalid_pass_type');
+    const n = decide(ids, (inv) => {
+      if (inv.status === 'cancelled' || inv.status === 'declined') return false;
+      if (inv.approval_status === 'approved' && inv.pass_type_id === pass.id) return false;
+      Object.assign(inv, { approval_status: 'approved', pass_type_id: pass.id, approved_at: nowIso(), approved_by: me.user_id });
+      return true;
+    }, 'invitation.approved', { pass_type: pass.name });
+    return delay(n, 250);
+  },
+
+  async reject(ids, reason) {
+    const me = requireRole(...CAN_EDIT);
+    const text = (reason ?? '').trim();
+    if (text.length > 500) throw new ApiError('validation');
+    const n = decide(ids, (inv) => {
+      if (inv.approval_status === 'rejected' || inv.checked_in_at) return false;
+      Object.assign(inv, { approval_status: 'rejected', pass_type_id: null, approved_at: null, approved_by: me.user_id });
+      return true;
+    }, 'invitation.rejected', text ? { reason: text } : {});
+    return delay(n, 250);
+  },
+
+  async resetApproval(ids) {
+    requireRole(...CAN_EDIT);
+    const n = decide(ids, (inv) => {
+      if (inv.approval_status === 'pending' || inv.checked_in_at) return false;
+      Object.assign(inv, { approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null });
+      return true;
+    }, 'invitation.approval_reset');
+    return delay(n, 250);
   },
 
   async markSent(ids, channel) {

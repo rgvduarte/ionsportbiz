@@ -7,5 +7,6 @@ import { invitations } from './invitations';
 import { templates } from './templates';
 import { checkin } from './checkin';
 import { guest } from './guest';
+import { passTypes } from './passTypes';
 
-export const demoApi: Api = { mode: 'demo', auth, staff, events, contacts, invitations, templates, checkin, guest };
+export const demoApi: Api = { mode: 'demo', auth, staff, events, contacts, invitations, templates, checkin, guest, passTypes };

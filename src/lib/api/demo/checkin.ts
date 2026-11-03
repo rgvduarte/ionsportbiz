@@ -42,6 +42,11 @@ function record(inv: Invitation): CheckinRecord {
     organization: c.organization,
     status: inv.status,
     wave: inv.wave,
+    approval_status: inv.approval_status,
+    pass_type: (() => {
+      const p = inv.approval_status === 'approved' ? d.passTypes.find((x) => x.id === inv.pass_type_id) : undefined;
+      return p ? { name: p.name, color: p.color, accesses: [...p.accesses] } : null;
+    })(),
     plus_ones_allowed: inv.plus_ones_allowed,
     checked_in_at: inv.checked_in_at,
     companions: d.companions
@@ -97,6 +102,7 @@ export const checkin: Api['checkin'] = {
     const me = requireRole(...CAN_CHECK_IN);
     const inv = find(invitationId);
     if (inv.status !== 'accepted' && !force) throw new ApiError('not_accepted');
+    if (inv.approval_status !== 'approved' && !force) throw new ApiError('not_approved');
     const now = nowIso();
     if (inv.checked_in_at === null) {
       inv.checked_in_at = now;
@@ -104,7 +110,7 @@ export const checkin: Api['checkin'] = {
       inv.updated_at = now;
       logActivity({
         kind: 'checkin', contact_id: inv.contact_id, invitation_id: inv.id, event_id: inv.event_id, channel: null,
-        detail: { status: inv.status, forced: inv.status !== 'accepted' },
+        detail: { status: inv.status, approval_status: inv.approval_status, forced: inv.status !== 'accepted' || inv.approval_status !== 'approved' },
       });
     }
     const ids = new Set(companionIds ?? []);

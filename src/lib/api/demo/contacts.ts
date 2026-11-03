@@ -292,6 +292,7 @@ export const contacts: Api['contacts'] & ErasureRequestsApi = {
             status: 'draft', wave, plus_ones_allowed: plusOnes, invited_by: d.currentUserId,
             sent_at: null, sent_channel: null, first_opened_at: null, last_opened_at: null, open_count: 0,
             responded_at: null, answers: {}, guest_note: null, checked_in_at: null, checked_in_by: null,
+            approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null,
             created_at: now, updated_at: now,
           };
           d.invitations.push(inv);

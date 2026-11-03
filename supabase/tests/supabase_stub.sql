@@ -1,8 +1,9 @@
 -- Simula o mínimo do Supabase (papéis, auth.users, auth.uid() e privilégios por omissão)
 -- para testar as migrações num Postgres normal. Não é aplicado no projeto real.
-create role anon nologin noinherit;
-create role authenticated nologin noinherit;
-create role service_role nologin noinherit bypassrls;
+-- Os papéis são do cluster: cada base de dados de teste reaproveita-os.
+do $$ begin create role anon nologin noinherit; exception when duplicate_object then null; end $$;
+do $$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end $$;
+do $$ begin create role service_role nologin noinherit bypassrls; exception when duplicate_object then null; end $$;
 
 create schema auth;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text);

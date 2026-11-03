@@ -12,6 +12,8 @@ export type ApiErrorCode =
   | 'invalid_note'
   | 'already_checked_in'
   | 'not_accepted'
+  | 'not_approved'
+  | 'invalid_pass_type'
   | 'last_admin'
   | 'duplicate'
   | 'validation'
@@ -30,6 +32,8 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   invalid_note: 'A mensagem é demasiado longa.',
   already_checked_in: 'A entrada já foi registada.',
   not_accepted: 'Este convidado não confirmou presença.',
+  not_approved: 'Presença ainda não aprovada pela equipa.',
+  invalid_pass_type: 'O tipo de acesso não pertence a este evento.',
   last_admin: 'Tem de existir pelo menos um administrador ativo.',
   duplicate: 'Já existe um registo igual.',
   validation: 'Verifique os dados introduzidos.',

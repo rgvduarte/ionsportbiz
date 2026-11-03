@@ -27,6 +27,8 @@ select set_config('request.jwt.claim.sub', :'editor', false);
 insert into events (slug, name, starts_at, status, capacity, default_plus_ones, marketing_consent_text)
 values ('gala-2027', 'Gala Anual', now() + interval '30 days', 'open', 4, 1, 'Aceito receber comunicações futuras.')
 returning id as ev \gset
+-- Estes testes cobrem o fluxo sem aprovação da equipa (approval.test.sql cobre a aprovação).
+update events set requires_approval = false where id = :'ev';
 insert into events (slug, name, starts_at, status) values ('rascunho', 'Rascunho', now() + interval '60 days', 'draft')
 returning id as ev_draft \gset
 
