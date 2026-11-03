@@ -17,5 +17,5 @@ export const config = {
 
 /** Link pessoal do convidado. */
 export function inviteUrl(token: string): string {
-  return `${config.publicUrl}/c/${token}`;
+  return `${config.publicUrl}${import.meta.env.VITE_ROUTER === 'hash' ? '/#' : ''}/c/${token}`;
 }

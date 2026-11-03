@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { createBrowserRouter, createHashRouter, Navigate, type RouteObject } from 'react-router';
 import { RequireStaff, RoleGate } from './guards';
 import { isNative } from '../native/platform';
 import { EmptyState, ButtonLink } from '../ui';
@@ -64,4 +64,7 @@ const routes: RouteObject[] = [
   { path: '*', Component: NotFound },
 ];
 
-export const router = createBrowserRouter(routes, { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' });
+// VITE_ROUTER=hash: rotas depois de "#", para alojamentos sem reescrita de rotas (ex.: demonstração no GitHub Pages).
+export const router = import.meta.env.VITE_ROUTER === 'hash'
+  ? createHashRouter(routes)
+  : createBrowserRouter(routes, { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' });
