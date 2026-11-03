@@ -1,6 +1,7 @@
 import { createBrowserRouter, createHashRouter, Link, type RouteObject } from 'react-router';
 import { Mail } from 'lucide-react';
 import { RequireStaff, RoleGate } from './guards';
+import { RouteError } from './RouteError';
 import { useAuth } from './AuthProvider';
 import { isNative } from '../native/platform';
 import { ButtonLink, useDocumentTitle } from '../ui';
@@ -84,6 +85,9 @@ const routes: RouteObject[] = [
   // App do evento (participantes): início, agenda, oradores, credencial, networking, notícias.
   { path: '/*', ...page(async () => (await import('../event/EventApp')).EventApp) },
 ];
+
+// Cada rota de topo mostra RouteError em vez do ecrã de erro técnico do React Router.
+for (const route of routes) route.ErrorBoundary = RouteError;
 
 // VITE_ROUTER=hash: rotas depois de "#", para alojamentos sem reescrita de rotas (ex.: demonstração no GitHub Pages).
 export const router = import.meta.env.VITE_ROUTER === 'hash'

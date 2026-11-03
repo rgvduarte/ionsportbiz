@@ -322,10 +322,10 @@
   background: var(--c-bg);
 }
 .ui-standalone__card { width: min(460px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-.ui-standalone__mark { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 10px; border-radius: var(--radius-lg); background: var(--c-accent); color: var(--c-gold-light); }
+.ui-standalone__mark { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 10px; border-radius: var(--radius-lg); background: var(--c-accent); color: var(--c-text-inverse); }
 .ui-standalone__mark svg { width: 22px; height: 22px; }
 .ui-standalone__eyebrow { font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-text-3); }
-.ui-standalone h1 { font-family: var(--font-serif); font-size: 30px; font-weight: 500; letter-spacing: -0.01em; }
+.ui-standalone h1 { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; }
 .ui-standalone p:not(.ui-standalone__eyebrow) { color: var(--c-text-2); max-width: 42ch; }
 .ui-standalone__actions { margin-top: 14px; }
 .ui-standalone__link { font-size: var(--text-sm); color: var(--c-text-3); text-decoration: underline; text-underline-offset: 3px; }
