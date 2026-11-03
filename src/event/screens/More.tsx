@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ChevronRight, CircleHelp, ExternalLink, Handshake, Languages, LogOut, Mail, Mic, Newspaper, Pencil, Star } from 'lucide-react';
+import { ChevronRight, CircleHelp, ExternalLink, Handshake, Languages, LogOut, Mail, MailCheck, Mic, Newspaper, Pencil, ShieldCheck, Star, Trash2 } from 'lucide-react';
 import { EVENT, PARTNERS } from '../data/event';
 import { INTERESTS, SECTORS } from '../data/people';
 import type { Sector } from '../data/types';
@@ -10,6 +10,8 @@ import { useToast } from '../components/Toast';
 import { fmtDate } from '../lib/format';
 import { useI18n } from '../lib/i18n';
 import { useAccessLabel } from '../lib/access';
+import { credentialState } from '../lib/invite';
+import { canRespond, safeUrl } from '../lib/rsvp';
 import { useProfile, useStore } from '../lib/store';
 import { asset } from '../lib/asset';
 
@@ -26,23 +28,83 @@ function Item({ to, href, icon, children, onClick }: { to?: string; href?: strin
   return <button className="menu-item" onClick={onClick}>{inner}</button>;
 }
 
+/** Confirmação dentro do menu, trazida para cima da barra de separadores (fica muitas vezes no fim da página). */
+function useScrollIntoView(open: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!open || !el) return;
+    const tabbar = document.querySelector('.ev .tabbar')?.getBoundingClientRect().height ?? 0;
+    const overflow = el.getBoundingClientRect().bottom - (window.innerHeight - tabbar - 16);
+    if (overflow > 0) window.scrollBy({ top: overflow, behavior: 'smooth' });
+  }, [open]);
+  return ref;
+}
+
+/** Proteção de dados: responsável, política e pedido de eliminação dos dados pessoais. */
+function Privacy() {
+  const { t } = useI18n();
+  const { state, requestErasure } = useStore();
+  const toast = useToast();
+  const [step, setStep] = useState<'idle' | 'confirm' | 'busy' | 'done'>('idle');
+  const ref = useScrollIntoView(step === 'confirm');
+  const e = state.view?.event;
+  if (!e) return null;
+  const policy = safeUrl(e.privacy_policy_url);
+  const preview = !!state.preview;
+
+  const send = async () => {
+    setStep('busy');
+    try {
+      await requestErasure();
+      setStep('done');
+    } catch {
+      setStep('confirm');
+      toast(t('more.eraseError'), 'error');
+    }
+  };
+
+  return (
+    <section className="menu privacy" aria-labelledby="privacy-title">
+      <div className="privacy-head">
+        <h2 id="privacy-title"><ShieldCheck size={20} /> {t('more.privacy')}</h2>
+        <p className="muted small">{t('more.privacyText')}</p>
+        {e.privacy_controller && (
+          <p className="small"><span className="muted">{t('more.controller')}:</span> {e.privacy_controller}</p>
+        )}
+      </div>
+      {policy && <Item href={policy} icon={<ShieldCheck size={20} />}>{t('more.policy')}</Item>}
+      {step === 'done' ? (
+        <p className="menu-confirm privacy-done" role="status">{t('more.eraseDone')}</p>
+      ) : step === 'idle' ? (
+        <Item icon={<Trash2 size={20} />} onClick={() => setStep('confirm')}>{t('more.erase')}</Item>
+      ) : (
+        <div className="menu-confirm" role="group" aria-label={t('more.erase')} ref={ref}>
+          <p>{preview ? t('preview.noSubmit') : t('more.eraseConfirm')}</p>
+          <div className="actions">
+            <button className="btn btn-ghost btn-sm" onClick={() => setStep('idle')} disabled={step === 'busy'}>{t('common.cancel')}</button>
+            <button className="btn btn-danger btn-sm" onClick={() => void send()} disabled={preview || step === 'busy'} aria-busy={step === 'busy'}>
+              {t('more.eraseYes')}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function More() {
   const { t, lang, setLang } = useI18n();
-  const { signOut } = useStore();
+  const { state, signOut } = useStore();
   const navigate = useNavigate();
   const p = useProfile();
   const access = useAccessLabel();
   const [confirmOut, setConfirmOut] = useState(false);
-  const confirmRef = useRef<HTMLDivElement>(null);
-  // A confirmação fica no fim da página: traz-se para cima da barra de separadores.
-  useEffect(() => {
-    const el = confirmRef.current;
-    if (!confirmOut || !el) return;
-    const tabbar = document.querySelector('.ev .tabbar')?.getBoundingClientRect().height ?? 0;
-    const overflow = el.getBoundingClientRect().bottom - (window.innerHeight - tabbar - 16);
-    if (overflow > 0) window.scrollBy({ top: overflow, behavior: 'smooth' });
-  }, [confirmOut]);
+  const confirmRef = useScrollIntoView(confirmOut);
   const sub = [p.role, p.company].filter(Boolean).join(' · ');
+  const view = state.view;
+  // Responder (ou mudar a resposta) enquanto o prazo estiver aberto e a entrada não estiver registada.
+  const reply = view && canRespond(view) ? (credentialState(view.invitation) === 'unconfirmed' ? t('more.respond') : t('more.change')) : null;
   return (
     <>
       <TopBar title={t('more.title')} />
@@ -56,6 +118,12 @@ export default function More() {
           </div>
           <Pencil size={18} className="muted" />
         </Link>
+
+        {reply && (
+          <nav className="menu">
+            <Item to="/convite" icon={<MailCheck size={20} />}>{reply}</Item>
+          </nav>
+        )}
 
         <nav className="menu">
           <Item to="/agenda?mine=1" icon={<Star size={20} />}>{t('more.myAgenda')}</Item>
@@ -75,6 +143,8 @@ export default function More() {
             </div>
           </div>
         </div>
+
+        <Privacy />
 
         <nav className="menu">
           <Item href={EVENT.website} icon={<img src={asset('images/logo-bubble.webp')} alt="" width={20} height={20} />}>{t('more.website')}</Item>

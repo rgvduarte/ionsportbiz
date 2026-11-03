@@ -64,6 +64,10 @@ describe('credentialState', () => {
     expect(inv('accepted', 'rejected')).toBe('rejected');
     expect(inv('declined', 'approved')).toBe('declined');
   });
+  it('a decisão da equipa vale mesmo antes da resposta; a recusa do convidado prevalece', () => {
+    expect(inv('opened', 'rejected')).toBe('rejected');
+    expect(inv('declined', 'rejected')).toBe('declined');
+  });
   it('sem código não há credencial, mesmo aprovado', () => {
     expect(inv('accepted', 'approved', null)).toBe('pending');
   });

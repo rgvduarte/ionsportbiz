@@ -6,14 +6,15 @@ import { useI18n } from '../lib/i18n';
 import { DEMO_CONTENT } from '../data/event';
 import { asset } from '../lib/asset';
 
-export function TopBar({ title, back, right }: { title?: string; back?: boolean; right?: ReactNode }) {
+/** Barra do topo. `back` recua no histórico; `onBack` (ex.: passo anterior de um formulário) substitui esse comportamento. */
+export function TopBar({ title, back, onBack, right }: { title?: string; back?: boolean; onBack?: () => void; right?: ReactNode }) {
   const navigate = useNavigate();
   const { t } = useI18n();
   return (
     <header className="topbar">
       <div className="topbar-side">
-        {back ? (
-          <button className="icon-btn" onClick={() => navigate(-1)} aria-label={t('common.back')}>
+        {back || onBack ? (
+          <button className="icon-btn" onClick={onBack ?? (() => navigate(-1))} aria-label={t('common.back')}>
             <ChevronLeft size={26} />
           </button>
         ) : (

@@ -1,4 +1,4 @@
-import { createBrowserRouter, createHashRouter, Link, type RouteObject } from 'react-router';
+import { createBrowserRouter, createHashRouter, Link, Navigate, type RouteObject } from 'react-router';
 import { Mail } from 'lucide-react';
 import { RequireStaff, RoleGate } from './guards';
 import { RouteError } from './RouteError';
@@ -51,8 +51,10 @@ function NotFound() {
 
 const routes: RouteObject[] = [
   { path: '/entrar', ...page(async () => (await import('../admin/LoginPage')).LoginPage) },
-  { path: '/c/:token', ...page(async () => (await import('../guest/GuestInvitationPage')).GuestInvitationPage) },
-  { path: '/app', ...page(async () => (await import('../guest/NativeHomePage')).NativeHomePage) },
+  // O link pessoal do convite (/c/:token, também ?preview=1 para a equipa) abre diretamente a app do evento:
+  // é tratado dentro dela (rota "/*" abaixo, ver src/event/InviteEntry.tsx), sem página de convite intermédia.
+  // "/app" era a lista de convites da app nativa: a app do evento faz agora esse papel.
+  { path: '/app', element: <Navigate to="/" replace /> },
   {
     path: '/admin',
     lazy: async () => {

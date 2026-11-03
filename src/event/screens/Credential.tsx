@@ -1,44 +1,20 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { QRCodeSVG } from 'qrcode.react';
-import { Check, CheckCircle2, CircleSlash, Hourglass, MailCheck, RefreshCw, SunMedium, TicketX, UserRoundX, WifiOff } from 'lucide-react';
+import { CalendarPlus, Check, CheckCircle2, CircleSlash, Hourglass, MailCheck, Navigation, RefreshCw, SunMedium, TicketX, UserRoundX, WifiOff } from 'lucide-react';
 import type { GuestView } from '../../lib/api/types';
+import { inviteUrl } from '../../lib/config';
+import { buildIcs, canDownloadIcs, downloadIcs, icsFilename } from '../../lib/ics';
 import { EVENT } from '../data/event';
 import { TopBar } from '../components/ui';
+import { useToast } from '../components/Toast';
 import { fmtTime } from '../lib/format';
 import { useI18n, type I18nKey } from '../lib/i18n';
 import { credentialState, groupCode, passColors, passIsVip, type CredentialState } from '../lib/invite';
+import { calendarUid, eventIsPast, mapsUrl } from '../lib/rsvp';
 import { useProfile, useStore } from '../lib/store';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 import { asset } from '../lib/asset';
-
-/** Pedidos ao servidor: ao entrar no ecrã, ao voltar à app e, enquanto se espera pela equipa, de 30 em 30 segundos. */
-function useLiveRefresh(waiting: boolean) {
-  const { refresh } = useStore();
-  const last = useRef(0);
-  useEffect(() => {
-    const run = () => {
-      // "focus" e "visibilitychange" chegam muitas vezes juntos: um pedido chega.
-      if (Date.now() - last.current < 2000) return;
-      last.current = Date.now();
-      void refresh();
-    };
-    run();
-    const onVisible = () => { if (document.visibilityState === 'visible') run(); };
-    window.addEventListener('focus', run);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.removeEventListener('focus', run);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [refresh]);
-  useEffect(() => {
-    if (!waiting) return;
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') { last.current = Date.now(); void refresh(); }
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [waiting, refresh]);
-}
 
 const STEPS: I18nKey[] = ['cred.step1', 'cred.step2', 'cred.step3', 'cred.step4'];
 
@@ -93,7 +69,7 @@ function contactHref(e: GuestView['event']): string {
 }
 
 /** Credencial aprovada: o passe com o QR code real e os acessos atribuídos pela equipa. */
-function Pass({ view }: { view: GuestView }) {
+function Pass({ view, actions }: { view: GuestView; actions?: ReactNode }) {
   const { t, locale } = useI18n();
   const p = useProfile();
   const inv = view.invitation;
@@ -138,6 +114,8 @@ function Pass({ view }: { view: GuestView }) {
         </p>
       )}
 
+      {actions}
+
       {pass && pass.accesses.length > 0 && (
         <>
           <h2 className="h2">{t('cred.access')}</h2>
@@ -155,6 +133,62 @@ function Pass({ view }: { view: GuestView }) {
         {t('cred.nominal')} {EVENT.fullName}.
       </p>
     </>
+  );
+}
+
+/** "Adicionar ao calendário" (.ics) e "Como chegar" (mapa), para quem já tem a credencial. */
+function PassActions({ view, token }: { view: GuestView; token: string }) {
+  const { t } = useI18n();
+  const { state } = useStore();
+  const toast = useToast();
+  const e = view.event;
+  // Calculado de antemão: na app nativa, a partilha do sistema tem de abrir logo a seguir ao toque.
+  const [uid, setUid] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void calendarUid(token).then((v) => { if (alive) setUid(v); });
+    return () => { alive = false; };
+  }, [token]);
+  if (eventIsPast(e)) return null;
+  const map = mapsUrl(e);
+  const ics = canDownloadIcs();
+  if (!map && !ics) return null;
+
+  const addToCalendar = async () => {
+    try {
+      // O link pessoal vai só no ficheiro, que fica no dispositivo do convidado (abre a credencial no dia).
+      // Na pré-visualização o convite não é de quem está a ver: sem link.
+      const link = state.preview ? null : inviteUrl(token);
+      const description = [e.host_name, e.dress_code, link && `${t('cred.calLink')}: ${link}`].filter(Boolean).join('\n');
+      await downloadIcs(icsFilename(e.name), buildIcs({
+        uid: uid ?? (await calendarUid(token)),
+        title: e.name,
+        description,
+        location: [e.venue_name, e.venue_address].filter(Boolean).join(', ') || null,
+        url: link,
+        start: e.starts_at,
+        end: e.ends_at,
+        organizerName: e.host_name,
+        organizerEmail: e.contact_email,
+      }));
+    } catch {
+      toast(t('cred.calError'), 'error');
+    }
+  };
+
+  return (
+    <div className="pass-actions">
+      {ics && (
+        <button className="btn btn-outline" onClick={() => void addToCalendar()}>
+          <CalendarPlus size={18} /> {t('agenda.addCal')}
+        </button>
+      )}
+      {map && (
+        <a className="btn btn-outline" href={map} target="_blank" rel="noopener noreferrer">
+          <Navigation size={18} /> {t('cred.directions')}
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -218,7 +252,7 @@ export default function Credential() {
       body = <PassSkeleton />;
     }
   } else if (cs === 'approved') {
-    body = <Pass view={view} />;
+    body = <Pass view={view} actions={<PassActions view={view} token={token} />} />;
   } else if (cs === 'pending') {
     body = (
       <StateCard tone="wait" icon={<Hourglass size={28} />} title={t('cred.pendingTitle')} actions={refreshBtn}>
@@ -238,7 +272,7 @@ export default function Credential() {
         tone="neutral"
         icon={<UserRoundX size={28} />}
         title={t('cred.declinedTitle')}
-        actions={view.event.rsvp_open ? <Link to={`/c/${token}`} className="btn btn-primary">{t('cred.openInvite')}</Link> : contact}
+        actions={view.event.rsvp_open ? <Link to="/convite" className="btn btn-primary">{t('cred.openInvite')}</Link> : contact}
       >
         <p>{view.event.rsvp_open ? t('cred.declinedBody') : t('cred.rsvpClosed')}</p>
       </StateCard>
@@ -250,7 +284,7 @@ export default function Credential() {
         tone="warn"
         icon={<MailCheck size={28} />}
         title={t('cred.unconfirmedTitle')}
-        actions={view.event.rsvp_open ? <Link to={`/c/${token}`} className="btn btn-primary">{t('cred.confirm')}</Link> : contact}
+        actions={view.event.rsvp_open ? <Link to="/convite" className="btn btn-primary">{t('cred.confirm')}</Link> : contact}
       >
         <p>{view.event.rsvp_open ? t('cred.unconfirmedBody') : t('cred.rsvpClosed')}</p>
         {pass && (

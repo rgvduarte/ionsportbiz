@@ -6,6 +6,7 @@ import { EVENT } from '../data/event';
 import { Boot } from '../components/ui';
 import { useI18n } from '../lib/i18n';
 import { parseInviteToken } from '../lib/invite';
+import { entryPath } from '../lib/rsvp';
 import { useStore } from '../lib/store';
 import { asset } from '../lib/asset';
 
@@ -21,7 +22,8 @@ export default function Welcome() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (state.token) return <Navigate to="/" replace />;
+  // Com convite: a resposta, se ainda faltar, ou o início (como ao abrir o link pessoal).
+  if (state.token) return <Navigate to={state.view && !state.preview ? entryPath(state.view) : '/'} replace />;
   if (!ready) return <Boot />;
 
   const submit = async (e: FormEvent) => {

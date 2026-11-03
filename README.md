@@ -4,7 +4,7 @@ App e back-office da **ion — International Business & Sports Conference** (PT 
 
 - **App do evento** (`/`): início, agenda, oradores, credencial QR, networking com reuniões 1:1, parceiros e notícias. Veio do repositório [rgvduarte/ionAPP](https://github.com/rgvduarte/ionAPP) e vive em `src/event/`.
 - **Back-office** (`/admin`): CRM de contactos, convidados por evento, envio de convites (email e WhatsApp), programa, check-in à porta e equipa.
-- **Convite pessoal** (`/c/<token>`): confirmação de presença, acompanhantes, consentimento e bilhete.
+- **Convite pessoal** (`/c/<token>`): abre diretamente a app do evento, onde o convidado responde (acompanhantes, perguntas, consentimento), acompanha a aprovação e recebe a credencial QR.
 - **Apps iOS e Android** (Capacitor) a partir do mesmo código.
 
 **Demonstração:** https://ionsportbiz.app/demo/ com dados fictícios guardados só no browser. Back-office em https://ionsportbiz.app/demo/#/admin, entrar com `admin@demo.pt` e qualquer palavra-passe. Convites de teste: https://ionsportbiz.app/demo/#/c/ionDemoConvite2027New1 (por responder) e https://ionsportbiz.app/demo/#/c/ionDemoConvite2027VIP1 (aprovado, VIP Pass).
@@ -93,6 +93,5 @@ Estrutura:
 | `supabase/functions` | Funções Deno: `send-invitations`, `invite-staff`, `_shared` (modelos de mensagem e email) |
 | `src/lib/api` | Contrato de dados (`types.ts`) com duas implementações: `supabase/` e `demo/` |
 | `src/admin` | Back-office |
-| `src/guest` | Página do convidado e início da app |
 | `src/native` | Integração Capacitor (leitor QR, links profundos) |
 | `src/ui` | Componentes e sistema de design |

@@ -39,9 +39,10 @@ export function guestName(c: Pick<GuestContact, 'salutation' | 'first_name' | 'l
 export type CredentialState = 'unconfirmed' | 'declined' | 'pending' | 'rejected' | 'approved';
 
 export function credentialState(inv: Pick<GuestView['invitation'], 'status' | 'approval_status' | 'checkin_code'>): CredentialState {
+  // A recusa do próprio convidado prevalece; depois, a decisão da equipa (mesmo antes de ele responder).
   if (inv.status === 'declined') return 'declined';
-  if (inv.status !== 'accepted') return 'unconfirmed';
   if (inv.approval_status === 'rejected') return 'rejected';
+  if (inv.status !== 'accepted') return 'unconfirmed';
   if (inv.approval_status === 'approved' && inv.checkin_code) return 'approved';
   return 'pending';
 }
