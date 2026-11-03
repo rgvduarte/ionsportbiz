@@ -3,9 +3,10 @@
 
 import type { EventRecord, InvitationRow, InvitationStatus, MessageTemplate, MessageTemplateInput } from '../../lib/api';
 import { formalName, formatDateTime } from '../../lib/format';
-import { INVITATION_STATUS } from '../../lib/status';
+import { APPROVAL_STATUS, INVITATION_STATUS } from '../../lib/status';
 import { toCsv } from '../../lib/csv';
 import { buildTemplateVars, renderMessage, type TemplateContact, type TemplateEvent } from '@shared/template';
+import { APPROVAL_FILTERS, approvalApplies, matchesApproval, type ApprovalFilter } from './approval';
 
 export type StatusFilter = InvitationStatus | 'all';
 
@@ -38,6 +39,8 @@ export interface ListFilters {
   status: StatusFilter;
   wave: string;
   search: string;
+  /** Por omissão, todos. */
+  approval?: ApprovalFilter;
 }
 
 function matchesWave(row: InvitationRow, wave: string): boolean {
@@ -52,16 +55,27 @@ export function matchesStatus(row: InvitationRow, status: StatusFilter): boolean
 }
 
 export function filterRows(rows: InvitationRow[], f: ListFilters): InvitationRow[] {
-  return rows.filter((r) => matchesStatus(r, f.status) && matchesWave(r, f.wave) && matchesSearch(r, f.search));
+  return rows.filter((r) => matchesStatus(r, f.status) && matchesApproval(r, f.approval ?? 'all') && matchesWave(r, f.wave) && matchesSearch(r, f.search));
 }
 
-/** Contagens de cada filtro de estado, com a vaga e a pesquisa atuais. */
+/** Contagens de cada filtro de estado, com a aprovação, a vaga e a pesquisa atuais. */
 export function countByStatus(rows: InvitationRow[], f: Omit<ListFilters, 'status'>): Record<StatusFilter, number> {
   const counts = Object.fromEntries(STATUS_FILTERS.map((s) => [s.value, 0])) as Record<StatusFilter, number>;
   for (const r of rows) {
-    if (!matchesWave(r, f.wave) || !matchesSearch(r, f.search)) continue;
+    if (!matchesApproval(r, f.approval ?? 'all') || !matchesWave(r, f.wave) || !matchesSearch(r, f.search)) continue;
     counts[r.status]++;
     if (r.status !== 'cancelled') counts.all++;
+  }
+  return counts;
+}
+
+/** Contagens de cada filtro de aprovação, com o estado, a vaga e a pesquisa atuais. */
+export function countByApproval(rows: InvitationRow[], f: Omit<ListFilters, 'approval'>): Record<ApprovalFilter, number> {
+  const counts = Object.fromEntries(APPROVAL_FILTERS.map((a) => [a.value, 0])) as Record<ApprovalFilter, number>;
+  for (const r of rows) {
+    if (!matchesStatus(r, f.status) || !matchesWave(r, f.wave) || !matchesSearch(r, f.search)) continue;
+    counts.all++;
+    for (const a of APPROVAL_FILTERS) if (a.value !== 'all' && matchesApproval(r, a.value)) counts[a.value]++;
   }
   return counts;
 }
@@ -69,7 +83,7 @@ export function countByStatus(rows: InvitationRow[], f: Omit<ListFilters, 'statu
 export interface Headcount {
   invited: number;
   accepted: number;
-  /** Convidados que confirmaram + os respetivos acompanhantes. */
+  /** Convidados que confirmaram + os respetivos acompanhantes (sem os não aprovados pela equipa, como a lotação). */
   expected: number;
   checkedIn: number;
 }
@@ -80,7 +94,7 @@ export function headcount(rows: InvitationRow[]): Headcount {
   return {
     invited: active.length,
     accepted: accepted.length,
-    expected: accepted.reduce((n, r) => n + 1 + r.companions_count, 0),
+    expected: accepted.reduce((n, r) => n + (r.approval_status === 'rejected' ? 0 : 1 + r.companions_count), 0),
     checkedIn: active.reduce((n, r) => n + (r.checked_in_at ? 1 : 0) + r.companions_checked_in, 0),
   };
 }
@@ -106,7 +120,7 @@ export function recipients(rows: InvitationRow[], selectedIds: ReadonlySet<strin
   };
 }
 
-export const ATTENDANCE_HEADERS = ['Convidado', 'Entidade', 'Cargo', 'Estado', 'Acompanhantes', 'Vaga', 'Entrada'];
+export const ATTENDANCE_HEADERS = ['Convidado', 'Entidade', 'Cargo', 'Estado', 'Aprovação', 'Tipo de acesso', 'Acompanhantes', 'Vaga', 'Entrada'];
 
 /** Lista de presenças para o Excel (BOM, ";"), pela ordem da lista. */
 export function attendanceCsv(rows: InvitationRow[], event: Pick<EventRecord, 'timezone'>): string {
@@ -117,6 +131,8 @@ export function attendanceCsv(rows: InvitationRow[], event: Pick<EventRecord, 't
       r.organization,
       r.job_title,
       INVITATION_STATUS[r.status].label,
+      approvalApplies(r) ? APPROVAL_STATUS[r.approval_status].label : '',
+      approvalApplies(r) && r.approval_status === 'approved' ? r.pass_type_name : '',
       r.plus_ones_allowed > 0 || r.companions_count > 0 ? `${r.companions_count} de ${r.plus_ones_allowed}` : '',
       r.wave,
       formatDateTime(r.checked_in_at, event.timezone),

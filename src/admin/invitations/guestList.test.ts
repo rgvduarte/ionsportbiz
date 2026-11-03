@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { InvitationRow } from '../../lib/api';
 import { renderMessage, buildTemplateVars } from '@shared/template';
 import {
-  attendanceCsv, attendanceFileName, capacityExcess, countByStatus, defaultTemplates, filterRows, headcount, matchesSearch, NO_WAVE,
-  personalMessage, recipients, runBulk, whatsappBody,
+  attendanceCsv, attendanceFileName, capacityExcess, countByApproval, countByStatus, defaultTemplates, filterRows, headcount, matchesSearch,
+  NO_WAVE, personalMessage, recipients, runBulk, whatsappBody,
 } from './guestList';
 
 let n = 0;
@@ -14,6 +14,7 @@ function row(p: Partial<InvitationRow>): InvitationRow {
     status: 'draft', wave: null, plus_ones_allowed: 0, invited_by: null, sent_at: null, sent_channel: null,
     first_opened_at: null, last_opened_at: null, open_count: 0, responded_at: null, answers: {}, guest_note: null,
     checked_in_at: null, checked_in_by: null, created_at: '', updated_at: '',
+    approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null, pass_type_name: null, pass_type_color: null,
     salutation: null, first_name: 'Ana', last_name: 'Costa', email: 'ana@exemplo.pt', phone: null, organization: null,
     job_title: null, segment: null, tags: [], language: 'pt', marketing_consent: false, companions_count: 0, companions_checked_in: 0,
     ...p,
@@ -52,6 +53,36 @@ describe('pesquisa e filtros', () => {
   it('conta pessoas esperadas e entradas com acompanhantes', () => {
     expect(headcount(rows)).toEqual({ invited: 4, accepted: 1, expected: 2, checkedIn: 2 });
   });
+
+  it('os não aprovados pela equipa não contam como pessoas esperadas', () => {
+    const rejected = row({ status: 'accepted', approval_status: 'rejected', companions_count: 1 });
+    expect(headcount([...rows, rejected])).toMatchObject({ accepted: 2, expected: 2 });
+  });
+});
+
+describe('filtro de aprovação', () => {
+  const approval = [
+    row({ first_name: 'A', status: 'accepted' }),
+    row({ first_name: 'B', status: 'accepted', approval_status: 'approved', pass_type_id: 'p1', pass_type_name: 'VIP Pass' }),
+    row({ first_name: 'C', status: 'sent', approval_status: 'approved', pass_type_id: 'p1', pass_type_name: 'VIP Pass' }),
+    row({ first_name: 'D', status: 'accepted', approval_status: 'rejected' }),
+    row({ first_name: 'E', status: 'sent' }),
+    row({ first_name: 'F', status: 'declined', approval_status: 'approved', pass_type_id: 'p1' }),
+  ];
+  const names = (f: Parameters<typeof filterRows>[1]) => filterRows(approval, f).map((r) => r.first_name);
+
+  it('"Por aprovar" só inclui quem confirmou; aprovados incluem pré-aprovados', () => {
+    expect(names({ status: 'all', wave: '', search: '', approval: 'pending' })).toEqual(['A']);
+    expect(names({ status: 'all', wave: '', search: '', approval: 'approved' })).toEqual(['B', 'C']);
+    expect(names({ status: 'all', wave: '', search: '', approval: 'rejected' })).toEqual(['D']);
+    expect(names({ status: 'accepted', wave: '', search: '', approval: 'approved' })).toEqual(['B']);
+  });
+
+  it('conta cada filtro de aprovação com o estado atual, e cada estado com a aprovação atual', () => {
+    expect(countByApproval(approval, { status: 'all', wave: '', search: '' })).toEqual({ all: 6, pending: 1, approved: 2, rejected: 1 });
+    expect(countByApproval(approval, { status: 'accepted', wave: '', search: '' })).toEqual({ all: 3, pending: 1, approved: 1, rejected: 1 });
+    expect(countByStatus(approval, { wave: '', search: '', approval: 'approved' })).toMatchObject({ all: 2, accepted: 1, sent: 1, declined: 0 });
+  });
 });
 
 describe('recipients', () => {
@@ -73,9 +104,20 @@ describe('recipients', () => {
 describe('attendanceCsv', () => {
   it('gera o CSV para o Excel com BOM, ";" e as colunas da lista de presenças', () => {
     const csv = attendanceCsv(rows.slice(0, 2), { timezone: 'Europe/Lisbon' });
-    expect(csv.startsWith('﻿Convidado;Entidade;Cargo;Estado;Acompanhantes;Vaga;Entrada\r\n')).toBe(true);
-    expect(csv).toContain('Inês Gonçalves;Instituto Aurora;;Confirmado;1 de 1;VIP;15/01/2027, 18:40\r\n');
-    expect(csv).toContain('Rui Matos;;;Enviado;;VIP;\r\n');
+    expect(csv.startsWith('﻿Convidado;Entidade;Cargo;Estado;Aprovação;Tipo de acesso;Acompanhantes;Vaga;Entrada\r\n')).toBe(true);
+    expect(csv).toContain('Inês Gonçalves;Instituto Aurora;;Confirmado;Por aprovar;;1 de 1;VIP;15/01/2027, 18:40\r\n');
+    expect(csv).toContain('Rui Matos;;;Enviado;;;;VIP;\r\n');
+  });
+
+  it('inclui a aprovação e o tipo de acesso (também dos pré-aprovados)', () => {
+    const csv = attendanceCsv([
+      row({ first_name: 'Vera', last_name: 'Lima', status: 'accepted', approval_status: 'approved', pass_type_name: 'VIP Pass' }),
+      row({ first_name: 'Nuno', last_name: 'Sá', status: 'sent', approval_status: 'approved', pass_type_name: 'Conference Pass' }),
+      row({ first_name: 'Rita', last_name: 'Gil', status: 'accepted', approval_status: 'rejected' }),
+    ], { timezone: 'Europe/Lisbon' });
+    expect(csv).toContain('Vera Lima;;;Confirmado;Aprovado;VIP Pass;;;\r\n');
+    expect(csv).toContain('Nuno Sá;;;Enviado;Aprovado;Conference Pass;;;\r\n');
+    expect(csv).toContain('Rita Gil;;;Confirmado;Não aprovado;;;;');
   });
 
   it('nome do ficheiro com o evento e a data', () => {

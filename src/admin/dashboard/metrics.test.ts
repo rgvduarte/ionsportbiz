@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EventStats } from '../../lib/api/types';
 import {
-  attendeesLine, breakdownLines, breakdownTotal, calendarDaysUntil, channelPhrase, eventPhase, funnel, showCheckins,
+  attendeesLine, breakdownLines, breakdownTotal, calendarDaysUntil, channelPhrase, eventPhase, funnel, passTypeLines, showCheckins,
 } from './metrics';
 
 const STATS: EventStats = {
@@ -13,6 +13,11 @@ const STATS: EventStats = {
   expected_attendees: 25,
   checked_in: 0,
   capacity: 100,
+  approval: { pending: 6, approved: 12, rejected: 0 },
+  by_pass_type: [
+    { pass_type_id: 'conf', name: 'Conference Pass', color: '#e27a2c', sort: 1, approved: 8, attendees: 10 },
+    { pass_type_id: 'vip', name: 'VIP Pass', color: '#ccff00', sort: 0, approved: 3, attendees: 5 },
+  ],
   by_wave: [],
   by_segment: [],
 };
@@ -88,5 +93,24 @@ describe('attendeesLine', () => {
   });
   it('sem confirmações', () => {
     expect(attendeesLine(stats(0, 0))).toBe('Ainda sem confirmações');
+  });
+  it('exclui os não aprovados pela equipa, como as pessoas esperadas', () => {
+    const s = { ...stats(18, 22), approval: { pending: 0, approved: 16, rejected: 2 } };
+    expect(attendeesLine(s)).toBe('16 confirmados + 6 acompanhantes (sem 2 não aprovados)');
+    expect(attendeesLine({ ...stats(1, 0), approval: { pending: 0, approved: 0, rejected: 1 } })).toBe('Sem confirmações aprovadas');
+  });
+});
+
+describe('passTypeLines', () => {
+  it('ordena pela ordem da equipa e junta os aprovados sem tipo', () => {
+    const lines = passTypeLines(STATS);
+    expect(lines.map((l) => [l.name, l.approved, l.attendees])).toEqual([
+      ['VIP Pass', 3, 5], ['Conference Pass', 8, 10], ['Sem tipo de acesso', 1, 0],
+    ]);
+    expect(lines[1].share).toBeCloseTo(8 / 12);
+  });
+
+  it('sem aprovados nem tipos', () => {
+    expect(passTypeLines({ approval: { pending: 0, approved: 0, rejected: 0 }, by_pass_type: [] })).toEqual([]);
   });
 });

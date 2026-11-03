@@ -88,12 +88,41 @@ export function channelPhrase(channel: Channel): string {
   return `por ${CHANNEL[channel]}`;
 }
 
-/** Decomposição das pessoas esperadas: convites confirmados + acompanhantes. */
-export function attendeesLine(s: Pick<EventStats, 'expected_attendees' | 'by_status'>): string {
-  const accepted = s.by_status.accepted;
-  if (!accepted) return 'Ainda sem confirmações';
+/** Decomposição das pessoas esperadas: convites confirmados + acompanhantes (sem os não aprovados pela equipa). */
+export function attendeesLine(s: Pick<EventStats, 'expected_attendees' | 'by_status' | 'approval'>): string {
+  const rejected = s.approval.rejected;
+  const accepted = Math.max(0, s.by_status.accepted - rejected);
+  if (!accepted) return s.by_status.accepted ? 'Sem confirmações aprovadas' : 'Ainda sem confirmações';
   const companions = Math.max(0, s.expected_attendees - accepted);
   const head = `${formatNumber(accepted)} ${accepted === 1 ? 'confirmado' : 'confirmados'}`;
-  if (!companions) return head;
-  return `${head} + ${formatNumber(companions)} ${companions === 1 ? 'acompanhante' : 'acompanhantes'}`;
+  const tail = rejected ? ` (sem ${formatNumber(rejected)} não ${rejected === 1 ? 'aprovado' : 'aprovados'})` : '';
+  if (!companions) return head + tail;
+  return `${head} + ${formatNumber(companions)} ${companions === 1 ? 'acompanhante' : 'acompanhantes'}${tail}`;
+}
+
+export interface PassTypeLine {
+  id: string | null;
+  name: string;
+  color: string | null;
+  /** Convidados com presença confirmada e aprovados com este tipo. */
+  approved: number;
+  /** Os mesmos, com acompanhantes. */
+  attendees: number;
+  /** Fração dos aprovados (0–1). */
+  share: number;
+}
+
+/**
+ * Aprovados por tipo de acesso, pela ordem definida pela equipa. Os aprovados sem tipo (ex.: tipo eliminado,
+ * ou aprovação automática) aparecem numa linha própria no fim.
+ */
+export function passTypeLines(s: Pick<EventStats, 'approval' | 'by_pass_type'>): PassTypeLine[] {
+  const total = s.approval.approved;
+  const typed = [...s.by_pass_type].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, 'pt-PT'));
+  const lines: PassTypeLine[] = typed.map((t) => ({
+    id: t.pass_type_id, name: t.name, color: t.color, approved: t.approved, attendees: t.attendees, share: ratio(t.approved, total),
+  }));
+  const without = Math.max(0, total - typed.reduce((n, t) => n + t.approved, 0));
+  if (without) lines.push({ id: null, name: 'Sem tipo de acesso', color: null, approved: without, attendees: 0, share: ratio(without, total) });
+  return lines;
 }

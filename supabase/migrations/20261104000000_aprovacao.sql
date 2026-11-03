@@ -54,6 +54,21 @@ end $$;
 create trigger invitations_pass_type_event before insert or update of pass_type_id, event_id on public.invitations
   for each row execute function public.check_pass_type_event();
 
+-- Eventos sem aprovação: uma confirmação (pelo convidado ou registada pela equipa) fica logo aprovada.
+create function public.auto_approve_without_review() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.status = 'accepted' and new.approval_status = 'pending'
+     and (tg_op = 'INSERT' or old.status is distinct from 'accepted')
+     and exists (select 1 from public.events e where e.id = new.event_id and not e.requires_approval) then
+    new.approval_status := 'approved';
+    new.approved_at := coalesce(new.approved_at, now());
+  end if;
+  return new;
+end $$;
+create trigger invitations_auto_approve before insert or update of status on public.invitations
+  for each row execute function public.auto_approve_without_review();
+
 -- ───────────────────────────── Vista da lista de convidados ─────────────────────────────
 
 create or replace view public.invitation_overview with (security_invoker = true) as
@@ -427,6 +442,7 @@ revoke execute on function public.approve_invitations(uuid[], uuid) from public,
 revoke execute on function public.reject_invitations(uuid[], text) from public, anon;
 revoke execute on function public.reset_approval(uuid[]) from public, anon;
 revoke execute on function public.check_pass_type_event() from public, anon, authenticated;
+revoke execute on function public.auto_approve_without_review() from public, anon, authenticated;
 grant execute on function public.approve_invitations(uuid[], uuid) to authenticated;
 grant execute on function public.reject_invitations(uuid[], text) to authenticated;
 grant execute on function public.reset_approval(uuid[]) to authenticated;

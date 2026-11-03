@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
-  Ban, Download, FileUp, Layers, MailCheck, Send, Trash2, UserPlus, Users, X,
+  Ban, BadgeCheck, Download, FileUp, Layers, MailCheck, RotateCcw, Send, ShieldX, Trash2, UserPlus, Users, X,
 } from 'lucide-react';
 import './invitations.css';
 import { api, type InvitationRow } from '../../lib/api';
@@ -9,22 +9,27 @@ import { useAsync } from '../../lib/useAsync';
 import { formalName, formatDateTime, formatNumber, formatTime, fullName } from '../../lib/format';
 import { usePermissions } from '../../app/AuthProvider';
 import {
-  ActionMenu, Alert, Avatar, Button, ButtonLink, Card, Dialog, EmptyState, Field, Input, LoadError, Pagination, Progress,
+  ActionMenu, Alert, Avatar, Badge, Button, ButtonLink, Card, Dialog, EmptyState, Field, Input, LoadError, Pagination, Progress,
   SearchInput, Select, Skeleton, useConfirm, useToast,
 } from '../../ui';
 import { useEventContext } from '../events/EventLayout';
 import {
-  attendanceCsv, attendanceFileName, countByStatus, filterRows, headcount, NO_WAVE, runBulk, STATUS_FILTERS,
+  attendanceCsv, attendanceFileName, countByApproval, countByStatus, filterRows, headcount, NO_WAVE, runBulk, STATUS_FILTERS,
   type BulkResult, type StatusFilter,
 } from './guestList';
+import {
+  APPROVAL_FILTERS, APPROVAL_PARAM, approvalApplies, approvalFromParam, approvalToParam, isPreApproved, resetPlan, type ApprovalFilter,
+} from './approval';
 import { ChannelIcon, channelLabel, downloadBlob, plural, StatusBadge, When } from './parts';
+import { ApprovalBadge, PassChip } from '../passes';
+import { ApproveDialog, RejectDialog } from './ApprovalDialogs';
 import { AddGuestsDialog } from './AddGuestsDialog';
 import { SendDialog } from './SendDialog';
 import { InvitationDrawer } from './InvitationDrawer';
 
 const PAGE_SIZE = 50;
 
-type DialogKind = 'add' | 'send' | 'wave' | null;
+type DialogKind = 'add' | 'send' | 'wave' | 'approve' | 'reject' | null;
 
 export function InvitationsPage() {
   const { event } = useEventContext();
@@ -44,9 +49,24 @@ export function InvitationsPage() {
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [busy, setBusy] = useState(false);
 
+  // Filtro de aprovação no endereço (?aprovacao=por-aprovar), para o painel poder ligar diretamente.
+  const approval = approvalFromParam(params.get(APPROVAL_PARAM));
+  const setApproval = useCallback((value: ApprovalFilter) => {
+    setParams((p) => {
+      const next = new URLSearchParams(p);
+      const param = approvalToParam(value);
+      if (param) next.set(APPROVAL_PARAM, param); else next.delete(APPROVAL_PARAM);
+      return next;
+    }, { replace: true });
+  }, [setParams]);
+
   const rows = useMemo(() => list.data ?? [], [list.data]);
-  const filtered = useMemo(() => filterRows(rows, { status, wave, search }), [rows, status, wave, search]);
-  const counts = useMemo(() => countByStatus(rows, { wave, search }), [rows, wave, search]);
+  const filtered = useMemo(() => filterRows(rows, { status, wave, search, approval }), [rows, status, wave, search, approval]);
+  const counts = useMemo(() => countByStatus(rows, { wave, search, approval }), [rows, wave, search, approval]);
+  const approvalCounts = useMemo(() => countByApproval(rows, { status, wave, search }), [rows, status, wave, search]);
+  const pendingApproval = useMemo(() => rows.filter((r) => r.status === 'accepted' && r.approval_status === 'pending').length, [rows]);
+  // Sem aprovação obrigatória, a coluna só aparece se a equipa a usou (tipos atribuídos, recusas ou confirmações por aprovar).
+  const showApproval = event.requires_approval || pendingApproval > 0 || rows.some((r) => r.pass_type_id || r.approval_status === 'rejected');
   const totals = useMemo(() => headcount(rows), [rows]);
   const waves = useMemo(() => [...new Set(rows.map((r) => r.wave).filter((w): w is string => !!w))].sort((a, b) => a.localeCompare(b, 'pt-PT')), [rows]);
   const hasNoWave = rows.some((r) => !r.wave);
@@ -60,7 +80,7 @@ export function InvitationsPage() {
   useEffect(() => {
     setSelected(new Set());
     setPage(0);
-  }, [status, wave, search, event.id]);
+  }, [status, wave, search, approval, event.id]);
 
   const openId = params.get('convite');
   const openDrawer = useCallback((id: string) => {
@@ -154,22 +174,69 @@ export function InvitationsPage() {
     finishBulk();
   };
 
+  const onApproved = (n: number, passName: string) => {
+    setDialog(null);
+    if (n) toast.success(`${plural(n, 'convidado aprovado', 'convidados aprovados')} com ${passName}.`);
+    else toast.info('Sem alterações: os convites selecionados já tinham este tipo de acesso.');
+    finishBulk();
+  };
+
+  const onRejected = (n: number) => {
+    setDialog(null);
+    if (n) toast.success(`${plural(n, 'presença marcada', 'presenças marcadas')} como não aprovada${n === 1 ? '' : 's'}.`);
+    else toast.info('Sem alterações nos convites selecionados.');
+    finishBulk();
+  };
+
+  const onResetApproval = async () => {
+    const plan = resetPlan(selectedRows);
+    if (!plan.change.length) {
+      return toast.info(plan.checkedIn ? 'Os convites selecionados já entraram ou já estão por aprovar.' : 'Os convites selecionados já estão por aprovar.');
+    }
+    const ok = await confirm({
+      title: `Repor a aprovação de ${plural(plan.change.length, 'convite', 'convites')}?`,
+      message: <>
+        Voltam a «Por aprovar» e perdem o tipo de acesso. Quem já tinha o código QR deixa de o ver até nova aprovação.
+        {plan.checkedIn > 0 && <> {plural(plan.checkedIn, 'convidado já entrou', 'convidados já entraram')} e fica{plan.checkedIn === 1 ? '' : 'm'} como está.</>}
+      </>,
+      confirmLabel: 'Repor aprovação',
+      cancelLabel: 'Voltar',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const n = await api.invitations.resetApproval(plan.change.map((r) => r.id));
+      toast.success(`${plural(n, 'convite voltou', 'convites voltaram')} a «Por aprovar».`);
+      finishBulk();
+    } catch (err) {
+      toast.error(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onExport = () => {
     if (!filtered.length) return;
     downloadBlob(attendanceFileName(event), attendanceCsv(filtered, event), 'text/csv;charset=utf-8');
     toast.success(`Lista exportada: ${plural(filtered.length, 'convidado', 'convidados')}.`);
   };
 
-  const filtersActive = status !== 'all' || !!wave || !!search;
+  const filtersActive = status !== 'all' || !!wave || !!search || approval !== 'all';
   const clearFilters = () => {
     setStatus('all');
     setWave('');
     setSearch('');
+    setApproval('all');
+  };
+  const showPending = () => {
+    setStatus('all');
+    setApproval('pending');
   };
 
   const statusLine = (
     <>
       {plural(totals.invited, 'convidado', 'convidados')} · {plural(totals.accepted, 'confirmado', 'confirmados')}
+      {pendingApproval > 0 && <> · {plural(pendingApproval, 'por aprovar', 'por aprovar')}</>}
       {totals.checkedIn > 0 && <> · {plural(totals.checkedIn, 'entrada', 'entradas')}</>}
     </>
   );
@@ -212,7 +279,7 @@ export function InvitationsPage() {
     body = (
       <>
         <div className="ui-table-wrap">
-          <table className={['ui-table', 'inv-table', busy && 'inv-busy'].filter(Boolean).join(' ')}>
+          <table className={['ui-table', 'inv-table', showApproval && 'inv-table--approval', busy && 'inv-busy'].filter(Boolean).join(' ')}>
             <thead>
               <tr>
                 {can.edit && (
@@ -229,6 +296,7 @@ export function InvitationsPage() {
                 )}
                 <th>Convidado</th>
                 <th className="inv-hide-md">Estado</th>
+                {showApproval && <th className="inv-hide-md">Aprovação</th>}
                 <th className="inv-hide-md">Vaga</th>
                 <th className="inv-hide-md num" title="Acompanhantes indicados / permitidos">Acomp.</th>
                 <th className="inv-hide-lg">Envio</th>
@@ -243,6 +311,7 @@ export function InvitationsPage() {
                   row={r}
                   tz={event.timezone}
                   selectable={can.edit}
+                  showApproval={showApproval}
                   selected={selected.has(r.id)}
                   onToggle={() => toggle(r.id)}
                   onOpen={() => openDrawer(r.id)}
@@ -303,6 +372,20 @@ export function InvitationsPage() {
       {event.status === 'archived' && (
         <Alert tone="info" className="inv-alert">O evento está arquivado: os links pessoais já não funcionam.</Alert>
       )}
+      {pendingApproval > 0 && (
+        <Alert tone="warning" className="inv-approval-alert">
+          <span>
+            <strong>{plural(pendingApproval, 'confirmação por aprovar', 'confirmações por aprovar')}.</strong>{' '}
+            Estes convidados só recebem o código QR e a lista de acessos depois de a equipa aprovar e escolher o tipo de acesso.
+            {approval === 'pending' && can.edit && ' Selecione-os e use «Aprovar…».'}
+          </span>
+          {approval !== 'pending' ? (
+            <Button size="sm" onClick={showPending}>Ver por aprovar</Button>
+          ) : can.edit && filtered.length > 0 && selected.size < filtered.length ? (
+            <Button size="sm" onClick={() => setSelected(new Set(filtered.map((r) => r.id)))}>Selecionar os {formatNumber(filtered.length)}</Button>
+          ) : null}
+        </Alert>
+      )}
 
       <Card padded={false} className="inv-card">
         <div className="inv-segments" role="group" aria-label="Filtrar por estado">
@@ -319,6 +402,23 @@ export function InvitationsPage() {
             </button>
           ))}
         </div>
+        {showApproval && (
+          <div className="inv-approval-row" role="group" aria-label="Filtrar por aprovação">
+            <span className="inv-approval-row__label" aria-hidden>Aprovação</span>
+            {APPROVAL_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                className={['inv-segment', 'inv-segment--sm', f.value === 'pending' && 'inv-segment--warn'].filter(Boolean).join(' ')}
+                aria-pressed={approval === f.value}
+                onClick={() => setApproval(f.value)}
+              >
+                {f.label}
+                <span className="inv-segment__count tabular">{list.data ? approvalCounts[f.value] : '–'}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="ui-toolbar inv-toolbar">
           <SearchInput value={search} onSearch={setSearch} placeholder="Pesquisar por nome, email ou entidade" className="ui-toolbar__grow" />
           {(waves.length > 0 || hasNoWave) && (
@@ -346,13 +446,16 @@ export function InvitationsPage() {
               )}
             </div>
             <div className="ui-row">
+              <Button size="sm" icon={<BadgeCheck />} onClick={() => setDialog('approve')} disabled={busy}>Aprovar…</Button>
               <Button size="sm" icon={<Send />} onClick={() => setDialog('send')} disabled={busy}>Enviar email</Button>
               <Button size="sm" icon={<MailCheck />} onClick={() => void onMarkSent()} disabled={busy}>Marcar como enviado</Button>
               <Button size="sm" icon={<Layers />} onClick={() => setDialog('wave')} disabled={busy}>Alterar vaga</Button>
               <ActionMenu
                 label="Mais ações"
                 items={[
-                  { label: 'Cancelar convites', icon: <Ban />, onSelect: () => void onCancel(), danger: true },
+                  { label: 'Não aprovar…', icon: <ShieldX />, onSelect: () => setDialog('reject') },
+                  { label: 'Repor aprovação', icon: <RotateCcw />, onSelect: () => void onResetApproval() },
+                  { label: 'Cancelar convites', icon: <Ban />, onSelect: () => void onCancel(), danger: true, separator: true },
                   { label: 'Remover da lista', icon: <Trash2 />, onSelect: () => void onRemove(), danger: true },
                 ]}
               />
@@ -405,6 +508,12 @@ export function InvitationsPage() {
           }}
         />
       )}
+      {dialog === 'approve' && (
+        <ApproveDialog event={event} rows={selectedRows} onClose={() => setDialog(null)} onDone={(n, pass) => onApproved(n, pass.name)} />
+      )}
+      {dialog === 'reject' && (
+        <RejectDialog rows={selectedRows} onClose={() => setDialog(null)} onDone={onRejected} />
+      )}
       {openId && (
         <InvitationDrawer
           id={openId}
@@ -420,10 +529,11 @@ export function InvitationsPage() {
   );
 }
 
-function GuestRow({ row: r, tz, selectable, selected, onToggle, onOpen }: {
+function GuestRow({ row: r, tz, selectable, showApproval, selected, onToggle, onOpen }: {
   row: InvitationRow;
   tz: string;
   selectable: boolean;
+  showApproval: boolean;
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
@@ -448,12 +558,16 @@ function GuestRow({ row: r, tz, selectable, selected, onToggle, onOpen }: {
             {meta && <div className="inv-person__meta">{meta}</div>}
             <div className="inv-person__mobile inv-only-md">
               <StatusBadge status={r.status} />
+              {showApproval && approvalApplies(r) && (r.approval_status === 'approved' && r.pass_type_name
+                ? <PassChip name={r.pass_type_name} color={r.pass_type_color} title={isPreApproved(r) ? 'Pré-aprovado' : 'Aprovado'} />
+                : <ApprovalBadge status={r.approval_status} />)}
               {r.wave && <span className="inv-person__meta">{r.wave}</span>}
             </div>
           </div>
         </div>
       </td>
       <td className="inv-hide-md"><StatusBadge status={r.status} /></td>
+      {showApproval && <td className="inv-hide-md"><ApprovalCell row={r} /></td>}
       <td className="inv-hide-md">{r.wave ? <span className="inv-wave">{r.wave}</span> : <span className="muted">—</span>}</td>
       <td className="inv-hide-md num">
         {r.plus_ones_allowed > 0 || r.companions_count > 0
@@ -481,6 +595,21 @@ function GuestRow({ row: r, tz, selectable, selected, onToggle, onOpen }: {
         ) : <span className="muted">—</span>}
       </td>
     </tr>
+  );
+}
+
+function ApprovalCell({ row: r }: { row: InvitationRow }) {
+  if (!approvalApplies(r)) return <span className="muted">—</span>;
+  const pre = isPreApproved(r);
+  return (
+    <div className="inv-apv">
+      {pre
+        ? <Badge tone="success" dot title="Aprovado antes de responder: recebe a credencial quando confirmar presença">Pré-aprovado</Badge>
+        : <ApprovalBadge status={r.approval_status} />}
+      {r.approval_status === 'approved' && (r.pass_type_name
+        ? <PassChip name={r.pass_type_name} color={r.pass_type_color} title={`Tipo de acesso: ${r.pass_type_name}`} />
+        : <span className="inv-cell-sub">Sem tipo de acesso</span>)}
+    </div>
   );
 }
 

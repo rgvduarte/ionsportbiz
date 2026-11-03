@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckinRecord } from '../../lib/api';
-import { capitalize, cleanCode, createDedupe, foreignRecentKeys, formatCode, isLookupInput, recentKey, verdict } from './code';
+import {
+  capitalize, cleanCode, createDedupe, forcedLabel, foreignRecentKeys, formatCode, isLookupInput, needsForce, recentKey, verdict,
+} from './code';
 
 const base: CheckinRecord = {
   invitation_id: 'i', event_id: 'e', event_name: 'E', salutation: null, first_name: 'Ana', last_name: 'Costa',
-  organization: null, status: 'accepted', wave: null, plus_ones_allowed: 1, checked_in_at: null, companions: [],
+  organization: null, status: 'accepted', wave: null, approval_status: 'approved',
+  pass_type: { name: 'VIP Pass', color: '#ccff00', accesses: ['VIP Gala Dinner'] }, plus_ones_allowed: 1, checked_in_at: null, companions: [],
 };
 
 describe('código de check-in', () => {
@@ -34,6 +37,20 @@ describe('verdict', () => {
     expect(verdict({ ...base, status: 'declined' })).toMatchObject({ severe: true });
     // Entrada forçada: conta como já registada, mesmo sem confirmação.
     expect(verdict({ ...base, status: 'sent', checked_in_at: '2027-01-01T19:00:00Z' }).kind).toBe('already');
+  });
+
+  it('confirmado mas sem aprovação da equipa', () => {
+    const pending = { ...base, approval_status: 'pending' as const, pass_type: null };
+    expect(verdict(pending)).toEqual({ kind: 'unapproved', approval: 'pending', severe: false });
+    expect(verdict({ ...pending, approval_status: 'rejected' })).toEqual({ kind: 'unapproved', approval: 'rejected', severe: true });
+    // Sem confirmação, o aviso principal continua a ser a falta de resposta.
+    expect(verdict({ ...pending, status: 'opened' }).kind).toBe('blocked');
+    expect(verdict({ ...pending, checked_in_at: '2027-01-01T19:00:00Z' }).kind).toBe('already');
+    expect(needsForce(base)).toBe(false);
+    expect(needsForce(pending)).toBe(true);
+    expect(needsForce({ ...base, status: 'sent' })).toBe(true);
+    expect(forcedLabel(pending)).toBe('Sem aprovação');
+    expect(forcedLabel({ status: 'sent' })).toBe('Sem confirmação');
   });
 });
 

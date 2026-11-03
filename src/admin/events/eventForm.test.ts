@@ -30,6 +30,7 @@ const EVENT: EventRecord = {
   privacy_controller: 'Fundação Exemplo, Avenida da Liberdade 100',
   privacy_policy_url: 'https://exemplo.pt/privacidade',
   marketing_consent_text: null,
+  requires_approval: false,
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
 };
@@ -47,6 +48,13 @@ describe('toFormValues / toEventInput', () => {
     expect(input.branding).toEqual({ accent: '#13294b', extra: 'x' });
     expect(input.capacity).toBe(120);
     expect(input.description).toBeNull();
+    expect(input.requires_approval).toBe(false);
+  });
+
+  it('aprovação da equipa: ligada por omissão nos eventos novos, mantida ao editar', () => {
+    expect(toFormValues(null).requires_approval).toBe(true);
+    expect(toFormValues(EVENT).requires_approval).toBe(false);
+    expect(toEventInput({ ...toFormValues(EVENT), requires_approval: true }, EVENT).requires_approval).toBe(true);
   });
 
   it('mantém a hora de parede quando muda o fuso', () => {
@@ -151,6 +159,7 @@ describe('copyableValues', () => {
     expect(c.venue_name).toBe('Palácio');
     expect(c.privacy_controller).toBe(EVENT.privacy_controller);
     expect(c.fields?.[0]).toMatchObject({ key: null, label: 'Restrições alimentares' });
+    expect(c.requires_approval).toBe(false);
     for (const k of ['name', 'slug', 'starts_at', 'ends_at', 'rsvp_deadline', 'invitation_text', 'description', 'status']) {
       expect(k in c).toBe(false);
     }

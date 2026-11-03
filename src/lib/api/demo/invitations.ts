@@ -174,7 +174,14 @@ export const invitations: Api['invitations'] = {
     if (patch.guest_note !== undefined) inv.guest_note = blank(patch.guest_note);
     if (patch.status !== undefined) {
       if (patch.status === 'accepted' || patch.status === 'declined') inv.responded_at = now;
+      const wasAccepted = inv.status === 'accepted';
       setInvitationStatus(inv, patch.status);
+      // Como o trigger invitations_auto_approve: sem aprovação obrigatória, a confirmação fica aprovada.
+      const event = getDb().events.find((e) => e.id === inv.event_id);
+      if (patch.status === 'accepted' && !wasAccepted && inv.approval_status === 'pending' && event && !event.requires_approval) {
+        inv.approval_status = 'approved';
+        inv.approved_at = now;
+      }
       // Como guest_respond: quem recusa deixa de ter acompanhantes.
       if (patch.status === 'declined') {
         const d = getDb();

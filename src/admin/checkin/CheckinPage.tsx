@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type RefObject } from 'react';
 import {
   ArrowLeft, CalendarDays, CalendarPlus, Check, CircleCheckBig, CircleX, History, Keyboard, MapPin, ScanLine, Search,
   TriangleAlert, Undo2, UserCheck, Users, X,
 } from 'lucide-react';
 import './checkin.css';
-import { api, type CheckinRecord, type EventRecord, type EventStats } from '../../lib/api';
+import { api, toApiError, type CheckinRecord, type EventRecord, type EventStats } from '../../lib/api';
 import { useAuth } from '../../app/AuthProvider';
 import { useCurrentEvent } from '../useCurrentEvent';
 import { INVITATION_STATUS } from '../../lib/status';
@@ -13,8 +13,10 @@ import {
   Badge, Button, ButtonLink, EmptyState, Input, LoadError, Progress, SearchInput, Select, Skeleton, useConfirm, useToast,
 } from '../../ui';
 import { QrScanner } from './QrScanner';
+import { AccessList, ApprovalBadge, passColor, PassChip, PassDot } from '../passes';
 import {
-  BLOCKED_TEXT, CODE_LENGTH, capitalize, foreignRecentKeys, formatCode, isLookupInput, personName, plural, recentKey, verdict,
+  BLOCKED_TEXT, CODE_LENGTH, capitalize, forcedLabel, foreignRecentKeys, formatCode, isLookupInput, needsForce, personName, plural, recentKey,
+  UNAPPROVED_TEXT, verdict,
 } from './code';
 
 const RETURN_AFTER_MS = 2500;
@@ -141,6 +143,14 @@ function CheckinDesk({ event, events, onSelect, canEdit, userId }: {
       live.refresh();
     } catch (err) {
       toast.error(err);
+      // A aprovação mudou desde a leitura (ex.: a equipa repôs a aprovação): mostra o estado atual e a opção de forçar.
+      if (toApiError(err).code === 'not_approved') {
+        const fresh = await api.checkin.search(event.id, personName(record)).then(
+          (rows) => rows.find((r) => r.invitation_id === record.invitation_id),
+          () => undefined,
+        );
+        setPanel({ kind: 'record', record: fresh ?? { ...record, approval_status: 'pending', pass_type: null } });
+      }
     } finally {
       setBusy(false);
     }
@@ -243,10 +253,10 @@ function CheckinDesk({ event, events, onSelect, canEdit, userId }: {
                     onUndo={() => void undo(panel.record)}
                     onRegister={async (ids, force) => {
                       const v = verdict(panel.record);
-                      if (force && v.kind === 'blocked') {
+                      if (force && (v.kind === 'blocked' || v.kind === 'unapproved')) {
                         const ok = await confirm({
-                          title: 'Dar entrada sem confirmação?',
-                          message: `${BLOCKED_TEXT[v.status].text} Confirme que tem indicação da organização para deixar entrar ${personName(panel.record)}.`,
+                          title: v.kind === 'unapproved' ? 'Dar entrada sem aprovação?' : 'Dar entrada sem confirmação?',
+                          message: `${v.kind === 'unapproved' ? UNAPPROVED_TEXT[v.approval].text : BLOCKED_TEXT[v.status].text} Confirme que tem indicação da organização para deixar entrar ${personName(panel.record)}.`,
                           confirmLabel: 'Dar entrada',
                           danger: true,
                         });
@@ -453,9 +463,12 @@ function SearchPanel({ eventId, timeZone, onPick }: { eventId: string; timeZone:
                     <span className="ck-result__side">
                       {r.checked_in_at ? (
                         <Badge tone="success" dot>Entrou às {formatTime(r.checked_in_at, timeZone)}{companionsIn ? ` (+${companionsIn})` : ''}</Badge>
+                      ) : r.status === 'accepted' && r.approval_status !== 'approved' ? (
+                        <ApprovalBadge status={r.approval_status} />
                       ) : (
                         <Badge tone={status.tone}>{status.label}</Badge>
                       )}
+                      {r.pass_type && <PassChip name={r.pass_type.name} color={r.pass_type.color} />}
                     </span>
                   </button>
                 </li>
@@ -523,6 +536,7 @@ function ResultPanel({ record, event, canEdit, busy, onClose, onRegister, onUndo
     <div className="ck-panel">
       <PanelHead onClose={onClose}>
         <Badge tone={status.tone} dot>{status.label}</Badge>
+        {record.status === 'accepted' && record.approval_status !== 'approved' && <ApprovalBadge status={record.approval_status} />}
         {record.wave && <Badge tone="gold">{record.wave}</Badge>}
       </PanelHead>
 
@@ -531,6 +545,16 @@ function ResultPanel({ record, event, canEdit, busy, onClose, onRegister, onUndo
         <h2 className="ck-person__name" ref={heading} tabIndex={-1}>{personName(record)}</h2>
         {record.organization && <div className="ck-person__org">{record.organization}</div>}
       </div>
+
+      {record.pass_type ? (
+        <section className="ck-pass" style={{ '--pass-color': passColor(record.pass_type.color) } as CSSProperties} aria-label="Tipo de acesso">
+          <div className="ck-pass__label">Tipo de acesso</div>
+          <PassChip name={record.pass_type.name} color={record.pass_type.color} size="lg" />
+          {record.pass_type.accesses.length > 0 && <AccessList accesses={record.pass_type.accesses} className="ck-pass__list" />}
+        </section>
+      ) : record.approval_status === 'approved' && event.requires_approval ? (
+        <p className="ck-panel__note">Aprovado sem tipo de acesso atribuído.</p>
+      ) : null}
 
       {v.kind === 'already' && (
         <div className="ck-notice ck-notice--warning" role="status">
@@ -551,6 +575,15 @@ function ResultPanel({ record, event, canEdit, busy, onClose, onRegister, onUndo
           <div>
             <strong>{BLOCKED_TEXT[v.status].title}</strong>
             <p>{BLOCKED_TEXT[v.status].text} Só dê entrada com indicação da organização.</p>
+          </div>
+        </div>
+      )}
+      {v.kind === 'unapproved' && (
+        <div className={`ck-notice ck-notice--${v.severe ? 'danger' : 'warning'}`} role="alert">
+          {v.severe ? <CircleX aria-hidden /> : <TriangleAlert aria-hidden />}
+          <div>
+            <strong>{UNAPPROVED_TEXT[v.approval].title}</strong>
+            <p>{UNAPPROVED_TEXT[v.approval].text} Só dê entrada com indicação da organização.</p>
           </div>
         </div>
       )}
@@ -595,11 +628,11 @@ function ResultPanel({ record, event, canEdit, busy, onClose, onRegister, onUndo
         )}
         {v.kind === 'already' && v.pending > 0 && (
           // Se a entrada foi dada sem confirmação, os acompanhantes também precisam de p_force.
-          <Button variant="primary" size="lg" block className="ck-cta" icon={<Check />} loading={busy} disabled={!n} onClick={() => void onRegister(ids, record.status !== 'accepted')}>
+          <Button variant="primary" size="lg" block className="ck-cta" icon={<Check />} loading={busy} disabled={!n} onClick={() => void onRegister(ids, needsForce(record))}>
             {n ? `Registar ${plural(n, 'acompanhante', 'acompanhantes')}` : 'Selecione os acompanhantes'}
           </Button>
         )}
-        {v.kind === 'blocked' && (
+        {(v.kind === 'blocked' || v.kind === 'unapproved') && (
           <Button variant={v.severe ? 'danger' : 'secondary'} size="lg" block className="ck-cta ck-cta--force" loading={busy} onClick={() => void onRegister(ids, true)}>
             <span className="ck-cta__label">Dar entrada mesmo assim{extra}</span>
           </Button>
@@ -648,7 +681,13 @@ function SuccessPanel({ panel, event, onClose }: { panel: Extract<Panel, { kind:
       <div className="ck-success__title">{title}</div>
       <div className="ck-success__name">{personName(record)}</div>
       {lines.length > 0 && <div className="ck-success__extra">{lines.join(' · ')}</div>}
-      <div className="ck-success__time">{formatTime(record.checked_in_at, event.timezone)}{forced ? ' · sem confirmação de presença' : ''}</div>
+      {record.pass_type && (
+        <div className="ck-success__pass"><PassDot color={record.pass_type.color} />{record.pass_type.name}</div>
+      )}
+      <div className="ck-success__time">
+        {formatTime(record.checked_in_at, event.timezone)}
+        {forced ? (record.status === 'accepted' ? ' · sem aprovação da equipa' : ' · sem confirmação de presença') : ''}
+      </div>
       <div className="ck-success__countdown" aria-hidden><span style={{ animationDuration: `${RETURN_AFTER_MS}ms` }} /></div>
       <Button size="lg" className="ck-success__next" icon={<ScanLine />} onClick={onClose}>Próximo convidado</Button>
     </div>
@@ -679,12 +718,15 @@ function RecentList({ entries, event, onOpen, onClear }: {
               <button type="button" className={['ck-recent__item', e.undone && 'is-undone'].filter(Boolean).join(' ')} onClick={() => onOpen(e.record)}>
                 <span className="ck-recent__time tabular">{formatTime(e.at, event.timezone)}</span>
                 <span className="ck-recent__who">
-                  <span className="ck-recent__name">{personName(e.record)}</span>
+                  <span className="ck-recent__name">
+                    {e.record.pass_type && <span title={e.record.pass_type.name}><PassDot color={e.record.pass_type.color} /></span>}
+                    {personName(e.record)}
+                  </span>
                   {e.record.organization && <span className="ck-recent__org">{e.record.organization}</span>}
                 </span>
                 <span className="ck-recent__tags">
                   {e.companions > 0 && <Badge>+{e.companions}</Badge>}
-                  {e.forced && <Badge tone="warning">Sem confirmação</Badge>}
+                  {e.forced && <Badge tone="warning">{forcedLabel(e.record)}</Badge>}
                   {e.undone && <Badge tone="danger">Anulada</Badge>}
                 </span>
               </button>

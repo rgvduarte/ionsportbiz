@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { useBlocker, useNavigate, useParams } from 'react-router';
+import { Link, useBlocker, useNavigate, useParams } from 'react-router';
 import {
-  ArrowDown, ArrowUp, CheckCircle2, Circle, Copy, ExternalLink, ImageOff, Lock, MapPin, Plus, RefreshCw, Sparkles, Trash2,
+  ArrowDown, ArrowUp, CheckCircle2, Circle, Copy, ExternalLink, ImageOff, Lock, MapPin, Plus, QrCode, RefreshCw, ShieldCheck, Sparkles,
+  Trash2,
 } from 'lucide-react';
 import './events.css';
 import { api, ApiError, type EventRecord, type EventStatus } from '../../lib/api';
@@ -59,6 +60,7 @@ const SECTIONS: { id: string; title: string; keys: string[] }[] = [
   { id: 'evf-identificacao', title: 'Identificação', keys: ['name', 'slug', 'host_name', 'invitation_text', 'description'] },
   { id: 'evf-data-local', title: 'Data e local', keys: ['starts_at', 'ends_at', 'timezone', 'rsvp_deadline', 'venue_name', 'venue_address', 'venue_maps_url', 'dress_code'] },
   { id: 'evf-convidados', title: 'Convidados e contacto', keys: ['capacity', 'default_plus_ones', 'contact_email', 'contact_phone'] },
+  { id: 'evf-aprovacao', title: 'Aprovação da equipa', keys: ['requires_approval'] },
   { id: 'evf-formulario', title: 'Formulário de resposta', keys: ['field:'] },
   { id: 'evf-imagem', title: 'Imagem', keys: ['accent', 'logo_url', 'theme'] },
   { id: 'evf-privacidade', title: 'Privacidade (RGPD)', keys: ['privacy_controller', 'privacy_policy_url', 'marketing_consent_text'] },
@@ -71,6 +73,21 @@ const sectionHasError = (keys: string[], errors: FormErrors) =>
 type TextKey = { [K in keyof EventFormValues]: EventFormValues[K] extends string ? K : never }[keyof EventFormValues];
 
 const STATUS_ORDER: EventStatus[] = ['draft', 'open', 'closed', 'archived'];
+
+const APPROVAL_OPTIONS: { value: boolean; label: string; hint: string; icon: ReactNode }[] = [
+  {
+    value: true,
+    label: 'Com aprovação',
+    hint: 'Quem confirma fica por aprovar até a equipa escolher o tipo de acesso. Só então recebe o código QR e a lista de acessos.',
+    icon: <ShieldCheck aria-hidden />,
+  },
+  {
+    value: false,
+    label: 'Sem aprovação',
+    hint: 'Quem confirma recebe logo a credencial (código QR).',
+    icon: <QrCode aria-hidden />,
+  },
+];
 // Um evento que ainda não existe não pode nascer fechado nem arquivado.
 const NEW_EVENT_STATUSES: EventStatus[] = ['draft', 'open'];
 
@@ -355,6 +372,10 @@ function EventForm({ event, onSaved }: { event: EventRecord | null; onSaved?: (e
             </div>
           </Section>
 
+          <Section id="evf-aprovacao" title="Aprovação da equipa" subtitle="O que acontece quando um convidado confirma presença.">
+            <Approval event={event} value={values.requires_approval} onChange={(requires_approval) => update({ requires_approval })} />
+          </Section>
+
           <Section
             id="evf-formulario"
             title="Formulário de resposta"
@@ -636,6 +657,49 @@ function DateAndPlace({ values, update, bind, err }: { values: EventFormValues; 
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// ───────── Aprovação da equipa ─────────
+
+function Approval({ event, value, onChange }: { event: EventRecord | null; value: boolean; onChange: (v: boolean) => void }) {
+  const changed = event && event.requires_approval !== value;
+  return (
+    <fieldset className="evf-status">
+      <legend className="visually-hidden">Aprovação da equipa</legend>
+      <div className="evf-status__grid">
+        {APPROVAL_OPTIONS.map((o) => (
+          <label key={String(o.value)} className="evf-status__option">
+            <input
+              type="radio"
+              name="requires_approval"
+              checked={value === o.value}
+              onChange={() => onChange(o.value)}
+              aria-describedby={`evf-approval-${o.value}`}
+            />
+            <span>
+              <span className="evf-status__name evf-approval__name">{o.icon}{o.label}</span>
+              <span className="evf-status__hint" id={`evf-approval-${o.value}`}>{o.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {changed && (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="info">
+            {value
+              ? 'Aplica-se às próximas confirmações. Quem já confirmou e foi aprovado mantém a credencial.'
+              : 'Aplica-se às próximas confirmações. Quem já confirmou e está por aprovar continua por aprovar até a equipa decidir, na lista de convidados.'}
+          </Alert>
+        </div>
+      )}
+      <p className="evf-approval__note">
+        {value ? 'A equipa escolhe o tipo de acesso ao aprovar; o convidado nunca o escolhe. Também pode aprovar antes da resposta (ex.: convidados de honra). ' : ''}
+        {event
+          ? <>Os tipos de acesso (ex.: VIP Pass, Conference Pass) definem-se no separador <Link to={`/admin/eventos/${event.id}/acessos`}>Acessos</Link>.</>
+          : 'Depois de criar o evento, defina os tipos de acesso (ex.: VIP Pass, Conference Pass) no separador Acessos.'}
+      </p>
+    </fieldset>
+  );
+}
 
 // ───────── Perguntas do formulário de resposta ─────────
 

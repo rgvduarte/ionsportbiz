@@ -1,0 +1,15 @@
+/* Tipos de acesso (pass-): ponto de cor, nome e lista de acessos. */
+
+.pass-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.pass-chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%; font-size: var(--text-sm); font-weight: 550; color: var(--c-text); }
+.pass-chip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pass-chip--lg { gap: 10px; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.02em; }
+.pass-chip--lg .pass-dot { width: 14px; height: 14px; }
+
+.pass-accesses { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); color: var(--c-text-2); }
+.pass-accesses li { position: relative; padding-left: 16px; overflow-wrap: anywhere; }
+.pass-accesses li::before {
+  content: ''; position: absolute; left: 2px; top: 0.55em; width: 6px; height: 6px; border-radius: 2px;
+  background: var(--pass-color, var(--c-accent));
+}
+.pass-accesses__empty { font-size: var(--text-sm); color: var(--c-text-3); }

@@ -1,8 +1,8 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import {
-  Ban, CheckCircle2, ChevronLeft, DoorOpen, EyeOff, FileJson, Mail, MailOpen, MailPlus, Pencil, RotateCcw, Send, ShieldAlert,
-  ShieldCheck, ShieldOff, StickyNote, Trash2, Undo2, UserPlus, UserRoundX, XCircle,
+  BadgeCheck, Ban, CheckCircle2, ChevronLeft, DoorOpen, EyeOff, FileJson, Mail, MailOpen, MailPlus, Pencil, RotateCcw, Send, ShieldAlert,
+  ShieldCheck, ShieldOff, ShieldX, StickyNote, Trash2, Undo2, UserPlus, UserRoundX, XCircle,
 } from 'lucide-react';
 import { api, ApiError, type Activity, type Contact, type Staff } from '../../lib/api';
 import { formatDate, formatDateTime, formatRelative, formatShortDate, formatTime, fullName } from '../../lib/format';
@@ -17,6 +17,8 @@ import {
 import { ContactFormDialog } from './ContactFormDialog';
 import { InviteToEventDialog } from './InviteToEventDialog';
 import { ConsentBadge, TagList, datedName, downloadFile, languageLabel, slugify } from './shared';
+import { ApprovalBadge } from '../passes';
+import { approvalApplies } from '../invitations/approval';
 import { deadlineLabel, deadlineState, erasureDeadline } from './erasure';
 import './contacts.css';
 
@@ -33,6 +35,9 @@ const KIND_ICON: Record<string, [typeof Mail, Tone | 'note' | null]> = {
   'invitation.declined': [XCircle, 'danger'],
   'invitation.cancelled': [Ban, null],
   'invitation.reopened': [RotateCcw, null],
+  'invitation.approved': [BadgeCheck, 'success'],
+  'invitation.rejected': [ShieldX, 'danger'],
+  'invitation.approval_reset': [RotateCcw, null],
   checkin: [DoorOpen, 'success'],
   'checkin.undone': [Undo2, null],
   'consent.granted': [ShieldCheck, 'success'],
@@ -282,7 +287,12 @@ export function ContactDetailPage() {
                               )}
                             </td>
                             <td className="tabular">{formatShortDate(inv.event.starts_at)}</td>
-                            <td><Badge tone={st.tone} dot>{st.label}</Badge></td>
+                            <td>
+                              <span className="ui-row" style={{ gap: 6 }}>
+                                <Badge tone={st.tone} dot>{st.label}</Badge>
+                                {approvalApplies(inv) && <ApprovalBadge status={inv.approval_status} />}
+                              </span>
+                            </td>
                             <td className="tabular" title={formatDateTime(inv.responded_at)}>
                               {inv.responded_at ? formatShortDate(inv.responded_at) : <span className="muted">—</span>}
                             </td>

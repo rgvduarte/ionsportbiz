@@ -78,6 +78,8 @@ export interface EventFormValues {
   privacy_controller: string;
   privacy_policy_url: string;
   marketing_consent_text: string;
+  /** true: quem confirma fica por aprovar até a equipa escolher o tipo de acesso. */
+  requires_approval: boolean;
   status: EventStatus;
 }
 
@@ -125,6 +127,7 @@ export function toFormValues(event?: EventRecord | null): EventFormValues {
     privacy_controller: event?.privacy_controller ?? '',
     privacy_policy_url: event?.privacy_policy_url ?? '',
     marketing_consent_text: event?.marketing_consent_text ?? '',
+    requires_approval: event?.requires_approval ?? true,
     status: event?.status ?? 'draft',
   };
 }
@@ -253,6 +256,7 @@ export function toEventInput(v: EventFormValues, base?: EventRecord | null): Eve
     privacy_controller: orNull(v.privacy_controller),
     privacy_policy_url: orNull(v.privacy_policy_url),
     marketing_consent_text: orNull(v.marketing_consent_text),
+    requires_approval: v.requires_approval,
   };
 }
 
@@ -305,7 +309,7 @@ export function timezoneCity(tz: string): string {
 }
 
 /**
- * Definições reutilizáveis de outro evento (local, contacto, perguntas, imagem, privacidade).
+ * Definições reutilizáveis de outro evento (local, contacto, perguntas, imagem, privacidade, aprovação).
  * Não copia o nome, o endereço curto, as datas, os textos próprios do evento nem o estado.
  */
 export function copyableValues(source: EventRecord): Partial<EventFormValues> {
@@ -329,5 +333,6 @@ export function copyableValues(source: EventRecord): Partial<EventFormValues> {
     privacy_controller: v.privacy_controller,
     privacy_policy_url: v.privacy_policy_url,
     marketing_consent_text: v.marketing_consent_text,
+    requires_approval: v.requires_approval,
   };
 }

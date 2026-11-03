@@ -128,4 +128,11 @@ select set_config('request.jwt.claim.sub', '', false);
 select public.guest_respond(:'tok_rui', true) as rr \gset
 select tests.eq((:'rr'::jsonb #>> '{invitation,approval_status}'), 'approved', 'sem aprovação: aprovado ao confirmar');
 select tests.ok((:'rr'::jsonb #>> '{invitation,checkin_code}') is not null, 'sem aprovação: QR ao confirmar');
+-- Sem aprovação: confirmação registada pela equipa também fica aprovada.
+set role authenticated;
+select set_config('request.jwt.claim.sub', :'editor', false);
+insert into contacts (first_name) values ('Sara') returning id as sara \gset
+insert into invitations (event_id, contact_id) values (:'ev2', :'sara') returning id as inv_sara \gset
+update invitations set status = 'accepted' where id = :'inv_sara';
+select tests.eq((select approval_status from invitations where id = :'inv_sara'), 'approved'::approval_status, 'sem aprovação: registo manual aprovado');
 reset role;

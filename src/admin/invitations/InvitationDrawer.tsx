@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import QRCode from 'qrcode';
 import {
-  AtSign, Ban, Check, ChevronRight, Copy, DoorOpen, Download, ExternalLink, FileText, History, Mail, MailCheck, MailOpen,
-  MessageCircle, Pencil, Phone, Plus, RotateCcw, Send, ShieldCheck, ShieldOff, Trash2, Undo2, UserCheck, UserX,
+  AtSign, BadgeCheck, Ban, Check, ChevronRight, Copy, DoorOpen, Download, ExternalLink, FileText, History, Mail, MailCheck, MailOpen,
+  MessageCircle, Pencil, Phone, Plus, RotateCcw, Send, ShieldCheck, ShieldOff, ShieldX, Ticket, Trash2, Undo2, UserCheck, UserX,
 } from 'lucide-react';
 import { api, toApiError, type Activity, type EventRecord, type InvitationRow, type MessageTemplate, type Companion, type InvitationStatus } from '../../lib/api';
 import { inviteUrl } from '../../lib/config';
@@ -19,6 +19,9 @@ import {
 } from '../../ui';
 import { capacityExcess, personalMessage, whatsappBody } from './guestList';
 import { ChannelIcon, copyText, plural, StatusBadge, When } from './parts';
+import { approvalApplies, isPreApproved } from './approval';
+import { ApproveDialog, RejectDialog } from './ApprovalDialogs';
+import { AccessList, ApprovalBadge, passColor, PassChip } from '../passes';
 
 interface Props {
   id: string;
@@ -63,11 +66,12 @@ export function InvitationDrawer({ id, event, templates, waves, onClose, onChang
         <DrawerSkeleton />
       ) : (
         <div className="inv-drawer">
-          <Identity row={row} />
+          <Identity row={row} showApproval={event.requires_approval || row.approval_status !== 'pending'} />
           {/* O link e o código de entrada são credenciais do convidado: só para quem pode enviar. */}
           {can.edit && <PersonalLink row={row} event={event} />}
           {can.edit && <SendSection row={row} event={event} templates={templates} onSent={refresh} />}
           <ResponseSection row={row} event={event} canEdit={can.edit} onSaved={refresh} />
+          <ApprovalSection row={row} event={event} canEdit={can.edit} history={history.data} staff={staff.data} onChanged={refresh} />
           <SettingsSection row={row} waves={waves} canEdit={can.edit} onSaved={refresh} />
           <CheckinSection row={row} tz={event.timezone} showCode={can.edit && !!row.checkin_code} />
           <HistorySection items={history.data} error={history.error} onRetry={history.reload} tz={event.timezone} staff={staff.data} />
@@ -105,13 +109,16 @@ function DrawerSkeleton() {
 
 // ───────── Identificação ─────────
 
-function Identity({ row }: { row: Detail }) {
+function Identity({ row, showApproval }: { row: Detail; showApproval: boolean }) {
   return (
     <div className="inv-identity">
       <Avatar name={fullName(row)} size="lg" />
       <div className="inv-identity__text">
         <div className="ui-row">
           <StatusBadge status={row.status} />
+          {showApproval && approvalApplies(row) && (row.approval_status === 'approved' && row.pass_type_name
+            ? <PassChip name={row.pass_type_name} color={row.pass_type_color} title={isPreApproved(row) ? 'Pré-aprovado' : 'Aprovado'} />
+            : <ApprovalBadge status={row.approval_status} />)}
           {row.wave && <Badge tone="accent">{row.wave}</Badge>}
           {row.language === 'en' && <Badge title="Os emails e o convite aparecem em inglês">EN</Badge>}
         </div>
@@ -506,6 +513,12 @@ function ResponseForm({ row, event, onCancel, onSaved }: { row: Detail; event: E
           {row.companions.length > 0 ? `, contando ${row.companions.length === 1 ? 'o acompanhante indicado' : `os ${row.companions.length} acompanhantes indicados`}` : ''}.
         </Alert>
       )}
+      {choice === 'accepted' && row.status !== 'accepted' && row.approval_status === 'pending' && (
+        <Alert tone="info">
+          A presença fica por aprovar: depois de registar, aprove-a na secção Aprovação e escolha o tipo de acesso. Só então o convidado
+          recebe o código QR.
+        </Alert>
+      )}
       {choice === 'declined' && row.companions.length > 0 && (
         <Alert tone="info">
           {row.companions.length === 1 ? 'O acompanhante indicado é retirado' : `Os ${row.companions.length} acompanhantes indicados são retirados`}, como
@@ -543,6 +556,160 @@ function ResponseForm({ row, event, onCancel, onSaved }: { row: Detail; event: E
         <Button variant="primary" type="submit" loading={saving} disabled={choice === 'accepted' && !stats.data && !stats.error}>Registar resposta</Button>
       </div>
     </form>
+  );
+}
+
+// ───────── Aprovação ─────────
+
+function ApprovalSection({ row, event, canEdit, history, staff, onChanged }: {
+  row: Detail;
+  event: EventRecord;
+  canEdit: boolean;
+  history: Activity[] | undefined;
+  staff: Map<string, string> | undefined;
+  onChanged: () => void;
+}) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [dialog, setDialog] = useState<'approve' | 'reject' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const passes = useAsync(() => api.passTypes.list(event.id), [event.id]);
+  const pass = passes.data?.find((p) => p.id === row.pass_type_id);
+  const closed = row.status === 'cancelled' || row.status === 'declined';
+  const applies = approvalApplies(row);
+  const pre = isPreApproved(row);
+  const checkedIn = !!row.checked_in_at;
+  const decidedBy = row.approved_by ? staff?.get(row.approved_by) : null;
+  const reason = row.approval_status === 'rejected'
+    ? (history?.find((a) => a.kind === 'invitation.rejected')?.detail as { reason?: unknown } | undefined)?.reason
+    : undefined;
+
+  const reset = async () => {
+    const ok = await confirm({
+      title: 'Repor a aprovação?',
+      message: row.approval_status === 'approved'
+        ? 'O convite volta a «Por aprovar» e perde o tipo de acesso. O convidado deixa de ver o código QR até nova aprovação.'
+        : 'O convite volta a «Por aprovar», para a equipa decidir de novo.',
+      confirmLabel: 'Repor aprovação',
+      cancelLabel: 'Voltar',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.invitations.resetApproval([row.id]);
+      toast.success('O convite voltou a «Por aprovar».');
+      onChanged();
+    } catch (err) {
+      toast.error(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  let text: ReactNode;
+  if (closed) {
+    text = row.status === 'declined' ? 'O convidado recusou o convite: não há aprovação a decidir.' : 'Convite cancelado: não há aprovação a decidir.';
+  } else if (row.approval_status === 'approved') {
+    text = pre
+      ? 'Pré-aprovado: recebe o código QR e a lista de acessos assim que confirmar presença.'
+      : 'Vê o código QR e a lista de acessos no convite pessoal.';
+  } else if (row.approval_status === 'rejected') {
+    text = 'Não aprovado: não recebe o código QR e não conta para a lotação.';
+  } else if (row.status === 'accepted') {
+    text = 'Confirmou presença e aguarda a decisão da equipa. Ainda não vê o código QR.';
+  } else {
+    text = event.requires_approval
+      ? 'Ainda sem resposta. Pode aprovar já (ex.: convidados de honra): recebe a credencial assim que confirmar.'
+      : 'Este evento não exige aprovação: quem confirma recebe logo a credencial. Pode, ainda assim, atribuir já um tipo de acesso.';
+  }
+
+  return (
+    <Section title="Aprovação" icon={<BadgeCheck aria-hidden />}>
+      <div className="inv-approval">
+        {(applies || closed) && (
+          <div className="inv-approval__state">
+            {pre ? <Badge tone="success" dot>Pré-aprovado</Badge> : applies && <ApprovalBadge status={row.approval_status} />}
+          </div>
+        )}
+        <p className="inv-help">{text}</p>
+
+        {row.approval_status === 'approved' && !closed && (
+          <div className="inv-approval__pass" style={{ '--pass-color': passColor(pass?.color ?? row.pass_type_color) } as CSSProperties}>
+            {row.pass_type_name ? (
+              <>
+                <PassChip name={row.pass_type_name} color={row.pass_type_color} size="lg" />
+                {pass?.description && <p className="inv-help">{pass.description}</p>}
+                {pass ? <AccessList accesses={pass.accesses} /> : passes.error ? null : <Skeleton width="60%" />}
+              </>
+            ) : (
+              <>
+                <span className="inv-subtitle" style={{ marginBottom: 0 }}><Ticket size={14} aria-hidden style={{ display: 'inline', verticalAlign: -2, marginRight: 6 }} />Sem tipo de acesso</span>
+                <p className="inv-help">
+                  {canEdit ? 'Atribua um tipo para o convidado ver a lista de acessos e a receção o identificar à porta.' : 'O convidado não vê lista de acessos.'}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {(row.approved_at || (row.approval_status === 'rejected' && row.approved_by)) && !closed && (
+          <p className="inv-approval__meta">
+            {row.approval_status === 'approved' ? 'Aprovado' : 'Decidido'}
+            {row.approved_at && <> <When iso={row.approved_at} tz={event.timezone} /></>}
+            {decidedBy && <> por {decidedBy}</>}
+            {!row.approved_by && row.approval_status === 'approved' && !event.requires_approval && ' automaticamente, ao confirmar'}
+          </p>
+        )}
+        {typeof reason === 'string' && reason && <p className="inv-approval__reason">Motivo: «{reason}»</p>}
+
+        {canEdit && !closed && (
+          <div className="inv-approval__actions">
+            {row.approval_status !== 'approved' && (
+              <Button size="sm" variant="primary" icon={<BadgeCheck />} onClick={() => setDialog('approve')} disabled={busy}>
+                {row.status === 'accepted' ? 'Aprovar…' : 'Pré-aprovar…'}
+              </Button>
+            )}
+            {row.approval_status === 'approved' && (
+              <Button size="sm" icon={<Ticket />} onClick={() => setDialog('approve')} disabled={busy}>
+                {row.pass_type_id ? 'Mudar tipo de acesso…' : 'Atribuir tipo de acesso…'}
+              </Button>
+            )}
+            {row.approval_status !== 'rejected' && (row.status === 'accepted' || row.approval_status === 'approved') && (
+              <Button size="sm" variant="danger-ghost" icon={<ShieldX />} onClick={() => setDialog('reject')} disabled={busy || checkedIn}>Não aprovar…</Button>
+            )}
+            {row.approval_status !== 'pending' && (
+              <Button size="sm" variant="ghost" icon={<RotateCcw />} onClick={() => void reset()} disabled={busy || checkedIn}>Repor</Button>
+            )}
+          </div>
+        )}
+        {canEdit && !closed && checkedIn && row.approval_status !== 'pending' && (
+          <p className="inv-help">Já entrou no evento: a aprovação já não pode ser retirada.</p>
+        )}
+      </div>
+      {dialog === 'approve' && (
+        <ApproveDialog
+          event={event}
+          rows={[row]}
+          onClose={() => setDialog(null)}
+          onDone={(n, p) => {
+            setDialog(null);
+            toast.success(n ? `${row.approval_status === 'approved' ? 'Tipo de acesso alterado para' : 'Aprovado com'} ${p.name}.` : 'Sem alterações.');
+            onChanged();
+          }}
+        />
+      )}
+      {dialog === 'reject' && (
+        <RejectDialog
+          rows={[row]}
+          onClose={() => setDialog(null)}
+          onDone={(n) => {
+            setDialog(null);
+            toast.success(n ? 'Presença marcada como não aprovada.' : 'Sem alterações.');
+            onChanged();
+          }}
+        />
+      )}
+    </Section>
   );
 }
 
@@ -623,10 +790,14 @@ function CheckinSection({ row, tz, showCode }: { row: Detail; tz: string; showCo
           <div>
             <div className="inv-subtitle">Código de entrada</div>
             <div className="inv-code mono" aria-label={`Código ${(row.checkin_code ?? '').split('').join(' ')}`}>{row.checkin_code}</div>
-            <p className="inv-help">Aparece no convite depois de confirmar presença; a receção lê-o no QR ou escreve-o.</p>
+            <p className="inv-help">
+              {row.status === 'accepted' && row.approval_status !== 'approved'
+                ? 'O convidado ainda não vê este código: falta a aprovação da equipa.'
+                : 'Aparece no convite depois de confirmar presença e de a equipa aprovar; a receção lê-o no QR ou escreve-o.'}
+            </p>
           </div>
         ) : (
-          <p className="inv-help">O código de entrada aparece no convite depois de o convidado confirmar presença.</p>
+          <p className="inv-help">O código de entrada aparece no convite depois de o convidado confirmar presença e de a equipa aprovar.</p>
         )}
         <div className="inv-checkin__state">
           {row.checked_in_at ? (
@@ -654,6 +825,9 @@ const KIND_ICON: Record<string, typeof Send> = {
   'invitation.declined': UserX,
   'invitation.cancelled': Ban,
   'invitation.reopened': RotateCcw,
+  'invitation.approved': BadgeCheck,
+  'invitation.rejected': ShieldX,
+  'invitation.approval_reset': RotateCcw,
   checkin: DoorOpen,
   'checkin.undone': Undo2,
   'consent.granted': ShieldCheck,
@@ -664,6 +838,9 @@ const KIND_ICON: Record<string, typeof Send> = {
 
 const TONE: Record<string, string> = {
   'invitation.accepted': 'success',
+  'invitation.approved': 'success',
+  'invitation.rejected': 'danger',
+  'invitation.approval_reset': 'warning',
   checkin: 'success',
   'invitation.declined': 'danger',
   'invitation.cancelled': 'danger',
@@ -681,7 +858,13 @@ function describe(a: Activity): string {
   }
   const wave = (a.detail as { wave?: unknown }).wave;
   if (a.kind === 'invitation.created' && typeof wave === 'string' && wave) parts.push(`vaga «${wave}»`);
-  if (a.kind === 'checkin' && (a.detail as { forced?: unknown }).forced) parts.push('sem confirmação prévia');
+  const detail = a.detail as { forced?: unknown; status?: unknown; pass_type?: unknown; reason?: unknown };
+  if (a.kind === 'checkin' && detail.forced) {
+    // Entrada forçada: sem confirmação de presença ou, com presença confirmada, sem aprovação da equipa.
+    parts.push(detail.status && detail.status !== 'accepted' ? 'sem confirmação prévia' : 'sem aprovação da equipa');
+  }
+  if (a.kind === 'invitation.approved' && typeof detail.pass_type === 'string' && detail.pass_type) parts.push(detail.pass_type);
+  if (a.kind === 'invitation.rejected' && typeof detail.reason === 'string' && detail.reason) parts.push(`«${detail.reason}»`);
   return parts.join(' · ');
 }
 

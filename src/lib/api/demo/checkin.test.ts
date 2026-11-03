@@ -87,7 +87,7 @@ describe('demo checkin', () => {
     expect(r2.companions[0].checked_in_at).not.toBeNull();
     const logs = d.activities.filter((a) => a.invitation_id === inv.id && a.kind === 'checkin');
     expect(logs).toHaveLength(1);
-    expect(logs[0].detail).toEqual({ status: 'accepted', forced: false });
+    expect(logs[0].detail).toEqual({ status: 'accepted', approval_status: 'approved', forced: false });
     expect(inv.checked_in_by).toBe(d.staff.find((s) => s.email === 'porta@demo.pt')!.user_id);
   });
 

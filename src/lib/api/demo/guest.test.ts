@@ -69,10 +69,11 @@ describe('demo guest.view', () => {
   it('payload sem dados internos; código só depois de confirmar', async () => {
     const opened = await guest.view(inv(MAIN, 'opened').token);
     expect(opened!.invitation.checkin_code).toBeNull();
-    const acc = inv(MAIN, 'accepted');
+    // Código só com presença confirmada e aprovada pela equipa.
+    const acc = getDb().invitations.find((x) => x.event_id === MAIN && x.status === 'accepted' && x.approval_status === 'approved')!;
     const v = await guest.view(acc.token);
     expect(v!.invitation.checkin_code).toMatch(/^[2-9A-HJ-NP-Z]{10}$/);
-    expect(Object.keys(v!.contact).sort()).toEqual(['first_name', 'language', 'last_name', 'marketing_consent', 'salutation']);
+    expect(Object.keys(v!.contact).sort()).toEqual(['first_name', 'job_title', 'language', 'last_name', 'marketing_consent', 'organization', 'salutation']);
     expect(v!.event).not.toHaveProperty('id');
     expect(v!.event).not.toHaveProperty('capacity');
     expect(v!.event.rsvp_open).toBe(true);
@@ -115,7 +116,9 @@ describe('demo guest.respond', () => {
       answers: { dieta: 'Vegetariana' }, companions: [{ full_name: '  Paulo Reis ' }], note: '  Chego um pouco mais tarde. ',
     }));
     expect(v.invitation.status).toBe('accepted');
-    expect(v.invitation.checkin_code).toBe(i.checkin_code);
+    // Evento com aprovação: fica por aprovar e ainda sem código.
+    expect(v.invitation.approval_status).toBe('pending');
+    expect(v.invitation.checkin_code).toBeNull();
     expect(v.invitation.companions).toEqual([{ full_name: 'Paulo Reis' }]);
     expect(v.invitation.answers).toEqual({ dieta: 'Vegetariana' });
     expect(v.invitation.guest_note).toBe('Chego um pouco mais tarde.');

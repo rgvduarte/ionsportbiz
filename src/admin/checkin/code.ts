@@ -1,6 +1,6 @@
 // Regras puras do ecrã de check-in (testadas em code.test.ts).
 
-import type { CheckinRecord, InvitationStatus } from '../../lib/api';
+import type { ApprovalStatus, CheckinRecord, InvitationStatus } from '../../lib/api';
 
 export const CODE_LENGTH = 10;
 const TOKEN_AT_END = /[A-Za-z0-9_-]{22}\/?$/;
@@ -26,15 +26,23 @@ export function isLookupInput(raw: string): boolean {
 export type Verdict =
   | { kind: 'ready' }
   | { kind: 'already'; at: string; pending: number }
-  | { kind: 'blocked'; status: Exclude<InvitationStatus, 'accepted'>; severe: boolean };
+  | { kind: 'blocked'; status: Exclude<InvitationStatus, 'accepted'>; severe: boolean }
+  /** Confirmou presença, mas a equipa ainda não aprovou (ou não aprovou). */
+  | { kind: 'unapproved'; approval: Exclude<ApprovalStatus, 'approved'>; severe: boolean };
 
 /** O que a porta deve fazer com este convite. */
 export function verdict(r: CheckinRecord): Verdict {
   if (r.checked_in_at) {
     return { kind: 'already', at: r.checked_in_at, pending: r.companions.filter((c) => !c.checked_in_at).length };
   }
-  if (r.status === 'accepted') return { kind: 'ready' };
-  return { kind: 'blocked', status: r.status, severe: r.status === 'declined' || r.status === 'cancelled' };
+  if (r.status !== 'accepted') return { kind: 'blocked', status: r.status, severe: r.status === 'declined' || r.status === 'cancelled' };
+  if (r.approval_status !== 'approved') return { kind: 'unapproved', approval: r.approval_status, severe: r.approval_status === 'rejected' };
+  return { kind: 'ready' };
+}
+
+/** Entrar (ou registar acompanhantes) exige p_force: sem presença confirmada ou sem aprovação. */
+export function needsForce(r: Pick<CheckinRecord, 'status' | 'approval_status'>): boolean {
+  return r.status !== 'accepted' || r.approval_status !== 'approved';
 }
 
 export const BLOCKED_TEXT: Record<Exclude<InvitationStatus, 'accepted'>, { title: string; text: string }> = {
@@ -44,6 +52,16 @@ export const BLOCKED_TEXT: Record<Exclude<InvitationStatus, 'accepted'>, { title
   declined: { title: 'Convite recusado', text: 'O convidado informou que não estaria presente.' },
   cancelled: { title: 'Convite cancelado', text: 'A organização cancelou este convite.' },
 };
+
+export const UNAPPROVED_TEXT: Record<Exclude<ApprovalStatus, 'approved'>, { title: string; text: string }> = {
+  pending: { title: 'Presença por aprovar', text: 'O convidado confirmou presença, mas a equipa ainda não aprovou nem atribuiu o tipo de acesso.' },
+  rejected: { title: 'Presença não aprovada pela equipa', text: 'A organização decidiu não aprovar esta presença.' },
+};
+
+/** Texto curto para uma entrada forçada (lista de últimas entradas, ecrã de sucesso). */
+export function forcedLabel(r: Pick<CheckinRecord, 'status'>): string {
+  return r.status === 'accepted' ? 'Sem aprovação' : 'Sem confirmação';
+}
 
 /** Ignora o mesmo código lido de novo dentro de `windowMs` (a câmara lê várias vezes por segundo). */
 export function createDedupe(windowMs = 3000) {

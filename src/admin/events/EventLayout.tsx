@@ -1,5 +1,5 @@
 import { Link, Outlet, useOutletContext, useParams } from 'react-router';
-import { CalendarDays, ChevronLeft, Mail, MapPin, Settings, ListChecks, Users } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Mail, MapPin, Settings, ListChecks, Ticket, Users } from 'lucide-react';
 import { api, type EventRecord } from '../../lib/api';
 import { useAsync } from '../../lib/useAsync';
 import { formatLongDate, formatTime } from '../../lib/format';
@@ -49,6 +49,7 @@ export function EventLayout() {
         tabs={[
           { to: base, label: 'Convidados', icon: <Users />, end: true },
           { to: `${base}/programa`, label: 'Programa', icon: <ListChecks /> },
+          { to: `${base}/acessos`, label: 'Acessos', icon: <Ticket /> },
           { to: `${base}/mensagens`, label: 'Mensagens', icon: <Mail /> },
           ...(can.edit ? [{ to: `${base}/definicoes`, label: 'Definições', icon: <Settings /> }] : []),
         ]}

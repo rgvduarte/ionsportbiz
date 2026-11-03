@@ -61,7 +61,8 @@ describe('demo events.stats', () => {
     const s = await events.stats(created.id);
     expect(s).toEqual({
       invited: 0, by_status: { draft: 0, sent: 0, opened: 0, accepted: 0, declined: 0 }, delivered: 0, opened: 0,
-      responded: 0, expected_attendees: 0, checked_in: 0, capacity: null, by_wave: [], by_segment: [],
+      responded: 0, expected_attendees: 0, checked_in: 0, capacity: null,
+      approval: { pending: 0, approved: 0, rejected: 0 }, by_pass_type: [], by_wave: [], by_segment: [],
     });
   });
 });

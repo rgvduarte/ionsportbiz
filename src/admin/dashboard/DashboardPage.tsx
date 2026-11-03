@@ -1,8 +1,8 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import {
-  AlertTriangle, Ban, CalendarDays, CalendarPlus, CheckCircle2, Clock, Eye, Info, ListChecks, MailPlus,
-  MapPin, RotateCcw, ScanLine, Send, Settings, ShieldCheck, ShieldOff, StickyNote, Upload, UserPlus, Users, XCircle,
+  AlertTriangle, BadgeCheck, Ban, CalendarDays, CalendarPlus, CheckCircle2, Clock, Eye, Info, ListChecks, MailPlus,
+  MapPin, RotateCcw, ScanLine, Send, Settings, ShieldCheck, ShieldOff, ShieldX, StickyNote, Ticket, Upload, UserPlus, Users, XCircle,
 } from 'lucide-react';
 import './dashboard.css';
 import { api, type Activity, type EventRecord, type EventStats } from '../../lib/api';
@@ -12,8 +12,10 @@ import { ACTIVITY, EVENT_STATUS, INVITATION_STATUS } from '../../lib/status';
 import { usePermissions } from '../../app/AuthProvider';
 import { Badge, ButtonLink, Card, EmptyState, LoadError, PageHeader, Select, Skeleton, Stat } from '../../ui';
 import { useCurrentEvent } from '../useCurrentEvent';
+import { passColor, PassDot } from '../passes';
+import { approvalListUrl } from '../invitations/approval';
 import {
-  attendeesLine, breakdownLines, breakdownTotal, calendarDaysUntil, channelPhrase, eventPhase, funnel, showCheckins,
+  attendeesLine, breakdownLines, breakdownTotal, calendarDaysUntil, channelPhrase, eventPhase, funnel, passTypeLines, showCheckins,
   type ActiveStatus, type BreakdownLine,
 } from './metrics';
 
@@ -120,6 +122,7 @@ function EventDashboard({ event }: { event: EventRecord }) {
               <BreakdownCard title="Por segmento" empty="Sem segmento" lines={breakdownLines(s.by_segment.map((w) => ({ ...w, name: w.segment })))} column="Segmento" />
             </div>
             <div className="dash-col">
+              <ApprovalCard event={event} s={s} />
               <AttentionCard event={event} s={s} />
               <ActivityCard event={event} />
             </div>
@@ -173,6 +176,7 @@ function Hero({ event }: { event: EventRecord }) {
         </div>
         <div className="dash-hero__links">
           <Link to={`${base}/programa`}><ListChecks aria-hidden />Programa</Link>
+          <Link to={`${base}/acessos`}><Ticket aria-hidden />Acessos</Link>
           <Link to={`${base}/mensagens`}><MailPlus aria-hidden />Mensagens</Link>
           {can.edit && <Link to={`${base}/definicoes`}><Settings aria-hidden />Definições</Link>}
         </div>
@@ -324,6 +328,85 @@ function FunnelCard({ s }: { s: EventStats }) {
   );
 }
 
+// ───────── Aprovação e tipos de acesso ─────────
+
+function ApprovalCard({ event, s }: { event: EventRecord; s: EventStats }) {
+  const can = usePermissions();
+  const { pending, approved, rejected } = s.approval;
+  const lines = passTypeLines(s);
+  // Sem aprovação obrigatória e sem tipos de acesso, o cartão não acrescenta nada.
+  if (!event.requires_approval && !s.by_pass_type.length && !pending && !rejected) return null;
+  const pendingUrl = approvalListUrl(event.id, 'pending');
+  return (
+    <Card
+      className="dash-approval-card"
+      title="Aprovação"
+      subtitle={event.requires_approval
+        ? 'Quem confirma recebe o código QR só depois de a equipa aprovar e escolher o tipo de acesso.'
+        : 'Este evento aprova automaticamente quem confirma.'}
+      actions={<Link to={`/admin/eventos/${event.id}/acessos`} className="dash-card-link">Acessos</Link>}
+    >
+      <div className="dash-approval">
+        <Link to={pendingUrl} className={['dash-approval__fig', 'dash-approval__fig--pending', pending > 0 && 'is-active'].filter(Boolean).join(' ')}>
+          <span className="dash-approval__label">Por aprovar</span>
+          <strong className="dash-approval__value">{formatNumber(pending)}</strong>
+        </Link>
+        <Link to={approvalListUrl(event.id, 'approved')} className="dash-approval__fig">
+          <span className="dash-approval__label">Aprovados</span>
+          <strong className="dash-approval__value">{formatNumber(approved)}</strong>
+        </Link>
+        <Link to={approvalListUrl(event.id, 'rejected')} className="dash-approval__fig">
+          <span className="dash-approval__label">Não aprovados</span>
+          <strong className="dash-approval__value">{formatNumber(rejected)}</strong>
+        </Link>
+      </div>
+      {pending > 0 && (
+        <ButtonLink to={pendingUrl} variant="primary" size="sm" icon={<BadgeCheck />} className="dash-approval__cta">
+          {can.edit
+            ? `Aprovar ${pending === 1 ? '1 confirmação' : `${formatNumber(pending)} confirmações`}`
+            : `Ver ${pending === 1 ? '1 confirmação' : `${formatNumber(pending)} confirmações`} por aprovar`}
+        </ButtonLink>
+      )}
+
+      <div className="dash-status">
+        <div className="dash-status__title">Por tipo de acesso</div>
+        {!s.by_pass_type.length ? (
+          <p className="dash-quiet">
+            Ainda não há tipos de acesso (ex.: VIP Pass, Conference Pass).{' '}
+            <Link to={`/admin/eventos/${event.id}/acessos`}>{can.edit ? 'Criar tipos de acesso' : 'Ver Acessos'}</Link>
+          </p>
+        ) : (
+          <>
+            {approved > 0 && (
+              <div className="dash-status__bar" role="img" aria-label={lines.map((l) => `${l.name}: ${l.approved}`).join(', ')}>
+                {lines.filter((l) => l.approved > 0).map((l) => (
+                  <span key={l.id ?? 'none'} style={{ flexGrow: l.approved, background: passColor(l.color) }} title={`${l.name}: ${l.approved}`} />
+                ))}
+              </div>
+            )}
+            <table className="dash-passes">
+              <caption className="visually-hidden">Convidados aprovados e pessoas por tipo de acesso</caption>
+              <thead>
+                <tr><th scope="col">Tipo</th><th scope="col" className="num">Convidados</th><th scope="col" className="num">Pessoas</th></tr>
+              </thead>
+              <tbody>
+                {lines.map((l) => (
+                  <tr key={l.id ?? 'none'}>
+                    <th scope="row"><span className="dash-passes__name">{l.id ? <PassDot color={l.color} /> : <span className="dash-passes__none" aria-hidden />}{l.name}</span></th>
+                    <td className="num">{formatNumber(l.approved)}</td>
+                    <td className="num">{l.id ? formatNumber(l.attendees) : <span className="muted">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="dash-note">Convidados com presença confirmada e aprovada; pessoas inclui acompanhantes.</p>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // ───────── Pontos de atenção ─────────
 
 interface Notice {
@@ -354,6 +437,22 @@ function AttentionCard({ event, s }: { event: EventRecord; s: EventStats }) {
         text: s.by_status.draft === 1 ? 'Há 1 convite por enviar.' : `Há ${formatNumber(s.by_status.draft)} convites por enviar.`,
         action: { to: base, label: 'Ver convidados' },
       });
+    }
+    if (s.approval.pending) {
+      list.push({
+        tone: 'warning',
+        text: s.approval.pending === 1
+          ? 'Há 1 confirmação por aprovar: o convidado ainda não tem código QR.'
+          : `Há ${formatNumber(s.approval.pending)} confirmações por aprovar: estes convidados ainda não têm código QR.`,
+        action: { to: approvalListUrl(event.id, 'pending'), label: can.edit ? 'Aprovar' : 'Ver' },
+      });
+      if (!s.by_pass_type.length) {
+        list.push({
+          tone: 'info',
+          text: 'Ainda não há tipos de acesso: são precisos para aprovar.',
+          action: { to: `${base}/acessos`, label: can.edit ? 'Criar' : 'Acessos' },
+        });
+      }
     }
     if (s.capacity) {
       const share = s.expected_attendees / s.capacity;
@@ -409,6 +508,9 @@ const ACTIVITY_ICON: Record<string, typeof Send> = {
   'invitation.declined': XCircle,
   'invitation.cancelled': Ban,
   'invitation.reopened': RotateCcw,
+  'invitation.approved': BadgeCheck,
+  'invitation.rejected': ShieldX,
+  'invitation.approval_reset': RotateCcw,
   checkin: ScanLine,
   'checkin.undone': RotateCcw,
   'consent.granted': ShieldCheck,
@@ -419,6 +521,8 @@ const ACTIVITY_ICON: Record<string, typeof Send> = {
 
 const ACTIVITY_TONE: Record<string, string> = {
   'invitation.accepted': 'success',
+  'invitation.approved': 'success',
+  'invitation.rejected': 'danger',
   checkin: 'success',
   'invitation.declined': 'danger',
   'invitation.cancelled': 'danger',
