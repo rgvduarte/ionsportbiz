@@ -19,7 +19,7 @@ export const auth: Api['auth'] = {
   async sendMagicLink(email) {
     check(await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: false, emailRedirectTo: `${config.publicUrl}/admin` },
+      options: { shouldCreateUser: false, emailRedirectTo: `${config.publicUrl}/` },
     }));
   },
   async signOut() {

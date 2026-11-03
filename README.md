@@ -7,7 +7,7 @@ App e back-office da **ion — International Business & Sports Conference** (PT 
 - **Convite pessoal** (`/c/<token>`): confirmação de presença, acompanhantes, consentimento e bilhete.
 - **Apps iOS e Android** (Capacitor) a partir do mesmo código.
 
-**Demonstração:** dados fictícios guardados só no browser. Back-office em `/#/admin`, entrar com `admin@demo.pt` e qualquer palavra-passe.
+**Demonstração:** https://ionsportbiz.app/demo/ com dados fictícios guardados só no browser. Back-office em https://ionsportbiz.app/demo/#/admin, entrar com `admin@demo.pt` e qualquer palavra-passe.
 
 ## Como funciona
 
@@ -39,9 +39,9 @@ Outros papéis: `editor@demo.pt`, `porta@demo.pt` (receção), `leitura@demo.pt`
 ## Instalação com Supabase
 
 1. **Criar o projeto** em [supabase.com](https://supabase.com), na região **EU (Frankfurt)**.
-2. **Aplicar o esquema:** no SQL Editor, correr `supabase/migrations/20261103000000_init.sql`
+2. **Aplicar o esquema:** no SQL Editor, correr os ficheiros de `supabase/migrations/` por ordem
    (ou, com a CLI: `supabase link` e `supabase db push`).
-3. **Autenticação:** em *Authentication → URL Configuration*, definir o *Site URL* para o endereço público da app e acrescentar `<endereço>/admin` aos *Redirect URLs*. Desligar *Allow new users to sign up* (as contas da equipa são criadas por convite).
+3. **Autenticação:** em *Authentication → URL Configuration*, definir o *Site URL* para o endereço público da app (`https://ionsportbiz.app`) e acrescentar `https://ionsportbiz.app/**` aos *Redirect URLs*. Desligar *Allow new users to sign up* (as contas da equipa são criadas por convite).
 4. **Primeiro administrador:** em *Authentication → Users → Invite user*, convidar o seu email. Depois, no SQL Editor:
 
    ```sql

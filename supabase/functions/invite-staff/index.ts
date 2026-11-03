@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
     let userId: string | null = null;
     let existing = false;
     const invited = await admin.auth.admin.inviteUserByEmail(input.email, {
-      ...(env.publicUrl ? { redirectTo: `${env.publicUrl}/admin` } : {}),
+      ...(env.publicUrl ? { redirectTo: `${env.publicUrl}/` } : {}),
       data: { full_name: input.full_name },
     });
     if (invited.error) {

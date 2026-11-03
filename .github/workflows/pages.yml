@@ -1,4 +1,4 @@
-# Publica a demonstração (dados fictícios, guardados só no browser) no GitHub Pages, em https://ionsportbiz.app.
+# Publica a app em https://ionsportbiz.app (ligada ao Supabase) e a demonstração em https://ionsportbiz.app/demo/.
 # Requer, uma vez: Settings → Pages → Source: GitHub Actions, e Custom domain: ionsportbiz.app.
 name: Demonstração no GitHub Pages
 
@@ -30,15 +30,25 @@ jobs:
       # ou https://rgvduarte.github.io/ionsportbiz enquanto o domínio não estiver ativo.
       - id: pages
         uses: actions/configure-pages@v5
-      - name: Build da demonstração
-        run: npx vite build --sourcemap false
+      # Produção: ligada ao Supabase. A URL e a publishable key são públicas por natureza (a segurança está na RLS).
+      - name: Build de produção
+        run: npx vite build
         env:
-          VITE_DEMO: '1'
           VITE_ROUTER: hash
           VITE_BASE: ${{ steps.pages.outputs.base_path }}/
           VITE_PUBLIC_URL: ${{ steps.pages.outputs.base_url }}
-      # Os modelos .well-known têm valores por preencher: não fazem sentido na demonstração.
-      - run: rm -rf dist/.well-known
+          VITE_SUPABASE_URL: https://dutzetiryubhfthptrhb.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_AP_v8qs5A9X03ikN52lKvA_3v8AJv3T
+      # Demonstração com dados fictícios (guardados só no browser), em /demo/.
+      - name: Build da demonstração
+        run: npx vite build --outDir dist/demo
+        env:
+          VITE_DEMO: '1'
+          VITE_ROUTER: hash
+          VITE_BASE: ${{ steps.pages.outputs.base_path }}/demo/
+          VITE_PUBLIC_URL: ${{ steps.pages.outputs.base_url }}/demo
+      # Os modelos .well-known têm valores por preencher (Team ID da Apple, SHA-256 da app Android).
+      - run: rm -rf dist/.well-known dist/demo/.well-known
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
