@@ -1,5 +1,5 @@
-# Publica a demonstração (dados fictícios, guardados só no browser) no GitHub Pages.
-# Requer, uma vez: Settings → Pages → Build and deployment → Source: GitHub Actions.
+# Publica a demonstração (dados fictícios, guardados só no browser) no GitHub Pages, em https://ionsportbiz.app.
+# Requer, uma vez: Settings → Pages → Source: GitHub Actions, e Custom domain: ionsportbiz.app.
 name: Demonstração no GitHub Pages
 
 on:
@@ -26,13 +26,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Endereço e caminho base vêm da configuração do Pages: https://ionsportbiz.app (domínio próprio)
+      # ou https://rgvduarte.github.io/ionsportbiz enquanto o domínio não estiver ativo.
+      - id: pages
+        uses: actions/configure-pages@v5
       - name: Build da demonstração
         run: npx vite build --sourcemap false
         env:
           VITE_DEMO: '1'
           VITE_ROUTER: hash
-          VITE_BASE: /${{ github.event.repository.name }}/
-          VITE_PUBLIC_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          VITE_BASE: ${{ steps.pages.outputs.base_path }}/
+          VITE_PUBLIC_URL: ${{ steps.pages.outputs.base_url }}
       # Os modelos .well-known têm valores por preencher: não fazem sentido na demonstração.
       - run: rm -rf dist/.well-known
       - uses: actions/upload-pages-artifact@v3

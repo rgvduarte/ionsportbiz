@@ -2,7 +2,7 @@
 
 Plataforma de convidados da **ion — International Business & Sports Conference**. Gestão de convidados para eventos por convite: CRM de contactos, listas de convidados por evento, envio de convites (email e WhatsApp), página pessoal do convidado com confirmação de presença e bilhete QR, check-in à porta e apps iOS/Android.
 
-**Demonstração:** https://rgvduarte.github.io/ionsportbiz/ (dados fictícios; entrar com `admin@demo.pt` e qualquer palavra-passe).
+**Demonstração:** https://ionsportbiz.app (dados fictícios; entrar com `admin@demo.pt` e qualquer palavra-passe).
 
 ## Como funciona
 
@@ -51,7 +51,7 @@ Outros papéis: `editor@demo.pt`, `porta@demo.pt` (receção), `leitura@demo.pt`
    ```bash
    supabase functions deploy send-invitations
    supabase functions deploy invite-staff
-   supabase secrets set PUBLIC_URL=https://convites.exemplo.pt \
+   supabase secrets set PUBLIC_URL=https://ionsportbiz.app \
      BREVO_API_KEY=… MAIL_FROM_EMAIL=convites@exemplo.pt MAIL_FROM_NAME="Nome da entidade"
    ```
 

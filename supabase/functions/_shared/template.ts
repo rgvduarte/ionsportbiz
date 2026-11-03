@@ -22,7 +22,7 @@ export const TEMPLATE_VARIABLES: readonly TemplateVariable[] = [
   { key: 'hora', label: 'Hora', example: '18:30' },
   { key: 'local', label: 'Local', example: 'Palácio do Exemplo, Rua das Janelas Verdes 1, Lisboa' },
   { key: 'prazo', label: 'Prazo de resposta', example: '1 de janeiro de 2027' },
-  { key: 'link', label: 'Link pessoal', example: 'https://convites.exemplo.pt/c/…' },
+  { key: 'link', label: 'Link pessoal', example: 'https://ionsportbiz.app/c/…' },
 ];
 
 const KNOWN_KEYS = new Set(TEMPLATE_VARIABLES.map((v) => v.key));

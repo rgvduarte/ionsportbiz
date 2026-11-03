@@ -90,9 +90,9 @@ Durante o desenvolvimento, para testar no telemóvel com recarregamento automát
 
 Com isto, o link pessoal `https://<domínio>/c/<token>` enviado por email ou WhatsApp abre diretamente na app, se estiver instalada (senão abre no browser, como sempre). O mesmo acontece com os links `https://<domínio>/admin…`.
 
-1. Substituir `convites.exemplo.pt` pelo domínio real em:
+1. O domínio é `ionsportbiz.app`, já configurado em:
    - `android/app/src/main/AndroidManifest.xml` (filtro com `android:autoVerify="true"`);
-   - `ios/App/App/App.entitlements` (`applinks:<domínio>`).
+   - `ios/App/App/App.entitlements` (`applinks:ionsportbiz.app`).
 2. Preencher os modelos em `public/.well-known/` (são publicados com o site):
    - `apple-app-site-association`: substituir `TEAMID` pelo *Team ID* da Apple (10 caracteres, em *developer.apple.com → Membership*), seguido de um ponto e do identificador da app.
    - `assetlinks.json`: substituir o texto `SHA256_…` pela impressão digital SHA-256 do **certificado de assinatura da app** (Play Console → *Configuração → Integridade da app → Assinatura de apps*). Para testar builds locais, acrescentar também a da chave de envio.

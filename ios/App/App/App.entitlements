@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Universal Links: substituir convites.exemplo.pt pelo domínio real (ver docs/apps-nativas.md). -->
+	<!-- Universal Links do domínio ionsportbiz.app (ver docs/apps-nativas.md). -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:convites.exemplo.pt</string>
+		<string>applinks:ionsportbiz.app</string>
 	</array>
 </dict>
 </plist>

@@ -31,15 +31,14 @@
             <!--
                 App Links: os links pessoais (https://<domínio>/c/<token>) e os links de acesso da equipa
                 (https://<domínio>/admin…) abrem diretamente na app.
-                Substituir convites.exemplo.pt pelo domínio real e publicar
-                https://<domínio>/.well-known/assetlinks.json (ver docs/apps-nativas.md).
+                Requer https://ionsportbiz.app/.well-known/assetlinks.json publicado (ver docs/apps-nativas.md).
             -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="convites.exemplo.pt" android:pathPrefix="/c/" />
-                <data android:scheme="https" android:host="convites.exemplo.pt" android:pathPrefix="/admin" />
+                <data android:scheme="https" android:host="ionsportbiz.app" android:pathPrefix="/c/" />
+                <data android:scheme="https" android:host="ionsportbiz.app" android:pathPrefix="/admin" />
             </intent-filter>
 
             <!-- Esquema próprio (convites://c/<token>), para testes e para abrir a app a partir de outras apps. -->
