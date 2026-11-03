@@ -1,5 +1,5 @@
-# Publica a demonstração (dados fictícios, guardados só no browser) no GitHub Pages, em https://ionsportbiz.app.
-# Requer, uma vez: Settings → Pages → Source: GitHub Actions, e Custom domain: ionsportbiz.app.
+# Publica a demonstração (dados fictícios, guardados só no browser) no GitHub Pages, em https://convites.ionsportbiz.app.
+# Requer, uma vez: Settings → Pages → Source: GitHub Actions, e Custom domain: convites.ionsportbiz.app.
 name: Demonstração no GitHub Pages
 
 on:
@@ -26,7 +26,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Endereço e caminho base vêm da configuração do Pages: https://ionsportbiz.app (domínio próprio)
+      # Endereço e caminho base vêm da configuração do Pages: https://convites.ionsportbiz.app (domínio próprio)
       # ou https://rgvduarte.github.io/ionsportbiz enquanto o domínio não estiver ativo.
       - id: pages
         uses: actions/configure-pages@v5
