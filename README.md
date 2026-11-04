@@ -95,3 +95,4 @@ Estrutura:
 | `src/admin` | Back-office |
 | `src/native` | Integração Capacitor (leitor QR, links profundos) |
 | `src/ui` | Componentes e sistema de design |
+| `src/lib/motion` | Animações (Motion): raiz `LazyMotion`, tokens de movimento, contador animado. Código adaptado de terceiros (MIT) em `THIRD_PARTY_NOTICES.md` |

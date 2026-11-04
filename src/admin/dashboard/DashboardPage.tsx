@@ -11,6 +11,7 @@ import { formatDate, formatDateTime, formatLongDate, formatNumber, formatPercent
 import { ACTIVITY, EVENT_STATUS, INVITATION_STATUS } from '../../lib/status';
 import { usePermissions } from '../../app/AuthProvider';
 import { Badge, ButtonLink, Card, EmptyState, LoadError, PageHeader, Select, Skeleton, Stat } from '../../ui';
+import { AnimatedCounter } from '../../lib/motion/AnimatedCounter';
 import { useCurrentEvent } from '../useCurrentEvent';
 import { passColor, PassDot } from '../passes';
 import { approvalListUrl } from '../invitations/approval';
@@ -214,6 +215,9 @@ function Deadline({ event }: { event: EventRecord }) {
 
 // ───────── Indicadores ─────────
 
+/** Percentagem inteira, igual à de formatPercent (arredondada), para o contador animado. */
+const pct = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0);
+
 function Kpis({ event, s }: { event: EventRecord; s: EventStats }) {
   const draft = s.by_status.draft;
   const capacity = s.capacity;
@@ -222,12 +226,12 @@ function Kpis({ event, s }: { event: EventRecord; s: EventStats }) {
     <div className="ui-stats dash-kpis">
       <Stat
         label="Convidados"
-        value={formatNumber(s.invited)}
+        value={<AnimatedCounter value={s.invited} />}
         hint={!s.invited ? 'Ainda sem convidados' : draft ? `${formatNumber(draft)} por enviar` : 'Todos os convites enviados'}
       />
       <Stat
         label="Pessoas esperadas"
-        value={<>{formatNumber(s.expected_attendees)}{capacity !== null && <span className="dash-of"> / {formatNumber(capacity)}</span>}</>}
+        value={<><AnimatedCounter value={s.expected_attendees} />{capacity !== null && <span className="dash-of"> / {formatNumber(capacity)}</span>}</>}
         progress={capacity ? s.expected_attendees / capacity : undefined}
         hint={<>
           {attendeesLine(s)} ·{' '}
@@ -238,18 +242,18 @@ function Kpis({ event, s }: { event: EventRecord; s: EventStats }) {
       />
       <Stat
         label="Taxa de resposta"
-        value={s.delivered ? formatPercent(s.responded, s.delivered) : '—'}
+        value={s.delivered ? <AnimatedCounter value={pct(s.responded, s.delivered)} suffix="%" /> : '—'}
         hint={s.delivered ? `${formatNumber(s.responded)} de ${formatNumber(s.delivered)} convites enviados` : 'Ainda sem convites enviados'}
       />
       <Stat
         label="Vistos"
-        value={s.delivered ? formatPercent(s.opened, s.delivered) : '—'}
+        value={s.delivered ? <AnimatedCounter value={pct(s.opened, s.delivered)} suffix="%" /> : '—'}
         hint={s.delivered ? `${formatNumber(s.opened)} de ${formatNumber(s.delivered)} convites enviados` : 'Ainda sem convites enviados'}
       />
       {showCheckins(event) && (
         <Stat
           label="Entradas"
-          value={<>{formatNumber(s.checked_in)}<span className="dash-of"> / {formatNumber(s.expected_attendees)}</span></>}
+          value={<><AnimatedCounter value={s.checked_in} /><span className="dash-of"> / {formatNumber(s.expected_attendees)}</span></>}
           progress={s.expected_attendees ? s.checked_in / s.expected_attendees : 0}
           hint={s.expected_attendees ? `${formatPercent(s.checked_in, s.expected_attendees)} das pessoas esperadas` : 'Sem confirmações'}
         />

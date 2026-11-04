@@ -10,6 +10,7 @@ import { ConfirmProvider, ToastProvider } from './ui';
 import { AuthProvider } from './app/AuthProvider';
 import { initNative } from './native/init';
 import { consumeAuthRedirect } from './lib/authRedirect';
+import { MotionRoot } from './lib/motion/MotionRoot';
 
 void initNative();
 
@@ -33,12 +34,14 @@ const { router } = await consumeAuthRedirect().then(() => import('./app/router')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ToastProvider>
-      <ConfirmProvider>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
-      </ConfirmProvider>
-    </ToastProvider>
+    <MotionRoot>
+      <ToastProvider>
+        <ConfirmProvider>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </ConfirmProvider>
+      </ToastProvider>
+    </MotionRoot>
   </StrictMode>,
 );

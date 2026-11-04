@@ -11,6 +11,7 @@ import {
   validateRsvp, type AnswerValue, type FormErrors,
 } from '../lib/rsvp';
 import { useProfile, useStore } from '../lib/store';
+import { KineticText } from '../components/KineticText';
 
 const NOTE_MAX = 1000;
 type Step = 'choice' | 'accept' | 'decline';
@@ -100,7 +101,7 @@ function Choice({ view, onChoose }: { view: GuestView; onChoose: (s: Step) => vo
         {p.firstName && <p className="greeting">{t('home.hello')}, <strong>{p.firstName}</strong></p>}
 
         <section className="invite-event">
-          <h1 className="invite-name">{e.name}</h1>
+          <h1 className="invite-name"><KineticText text={e.name} delay={0.1} /></h1>
           <ul className="facts invite-facts">
             <li>
               <CalendarDays size={18} />

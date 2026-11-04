@@ -28,7 +28,10 @@ function Shell() {
   if (!state.token) return ready ? <Navigate to="/welcome" replace /> : <Boot />;
   return (
     <div className="app">
-      <Outlet />
+      {/* Chave pelo caminho: cada ecrã novo entra com um esbatimento curto (.screen-in). */}
+      <div key={pathname} className="screen-in">
+        <Outlet />
+      </div>
       <TabBar />
     </div>
   );

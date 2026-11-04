@@ -10,23 +10,37 @@ import { useI18n, type I18nKey } from '../lib/i18n';
 import { pendingCount, useStore } from '../lib/store';
 import { useCountdown } from '../lib/useCountdown';
 import { asset } from '../lib/asset';
+import { FlapDigit } from '../components/SplitFlap';
 
+/** Contagem decrescente em painel de partidas: cada algarismo é uma placa (ver SplitFlap). */
 function Countdown() {
   const { t } = useI18n();
   const c = useCountdown(EVENT.start);
   if (c.done) return <p className="countdown-live">{t('home.live')}</p>;
-  const cell = (v: number, l: string) => (
-    <div className="cd-cell">
-      <span className="cd-num">{String(v).padStart(2, '0')}</span>
-      <span className="cd-label">{l}</span>
-    </div>
-  );
+  let order = 0;
+  const group = (v: number, label: string) => {
+    const s = String(v).padStart(2, '0');
+    return (
+      <div className="cd-group">
+        <span className="cd-digits">
+          {/* Chave pela posição a contar da direita: de 100 para 99 dias, as unidades continuam na mesma placa. */}
+          {[...s].map((d, i) => <FlapDigit key={s.length - i} digit={d} delay={order++ * 60} />)}
+        </span>
+        <span className="cd-label">{label}</span>
+      </div>
+    );
+  };
   return (
-    <div className="countdown" aria-label={t('home.countdown')}>
-      {cell(c.days, t('home.days'))}
-      {cell(c.hours, t('home.hours'))}
-      {cell(c.minutes, t('home.min'))}
-      {cell(c.seconds, t('home.sec'))}
+    <div className="countdown" role="timer" aria-label={t('home.countdown')}>
+      <span className="visually-hidden">
+        {c.days} {t('home.days')}, {c.hours} {t('home.hours')}, {c.minutes} {t('home.min')}
+      </span>
+      <div className="cd-board" aria-hidden>
+        {group(c.days, t('home.days'))}
+        {group(c.hours, t('home.hours'))}
+        {group(c.minutes, t('home.min'))}
+        {group(c.seconds, t('home.sec'))}
+      </div>
     </div>
   );
 }

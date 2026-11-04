@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
+import { m } from 'motion/react';
+import { motionTokens } from '../../lib/motion/tokens';
 import { CalendarDays, Ellipsis, House, QrCode, Users } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import { pendingCount, useStore } from '../lib/store';
@@ -10,11 +12,17 @@ export function TabBar() {
   const pending = pendingCount(state);
   const tab = (to: string, label: string, icon: ReactNode, badge?: number) => (
     <NavLink to={to} end={to === '/'} className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
-      <span className="tab-icon">
-        {icon}
-        {!!badge && <span className="badge">{badge}</span>}
-      </span>
-      <span className="tab-label">{label}</span>
+      {({ isActive }) => (
+        <>
+          <span className="tab-icon">
+            {/* Destaque partilhado: desliza de um separador para o outro (layoutId). */}
+            {isActive && <m.span layoutId="ev-tab-ind" className="tab-ind" transition={motionTokens.spring.morph} aria-hidden />}
+            {icon}
+            {!!badge && <span className="badge">{badge}</span>}
+          </span>
+          <span className="tab-label">{label}</span>
+        </>
+      )}
     </NavLink>
   );
   return (

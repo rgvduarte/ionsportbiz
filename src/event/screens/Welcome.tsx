@@ -9,6 +9,7 @@ import { parseInviteToken } from '../lib/invite';
 import { entryPath } from '../lib/rsvp';
 import { useStore } from '../lib/store';
 import { asset } from '../lib/asset';
+import { KineticText } from '../components/KineticText';
 
 /**
  * Entrada da app: só para convidados. Entra-se com o link pessoal do convite (o mesmo do email ou do WhatsApp).
@@ -62,7 +63,7 @@ export default function Welcome() {
       {step === 'intro' ? (
         <div className="welcome-body">
           <img src={asset('images/march-27.webp')} alt="March ’27" className="welcome-date" />
-          <h1 className="display">{t('welcome.title')}</h1>
+          <h1 className="display"><KineticText text={t('welcome.title')} delay={0.15} /></h1>
           <div className="invite-only">
             <span className="invite-only-icon" aria-hidden><LockKeyhole size={20} /></span>
             <div>

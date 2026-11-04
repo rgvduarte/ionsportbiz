@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import { m } from 'motion/react';
+import { motionTokens } from '../../lib/motion/tokens';
 import { useNavigate } from 'react-router';
 import { ChevronLeft } from 'lucide-react';
 import { initials } from '../lib/format';
@@ -54,12 +56,15 @@ export function Chip({ active, onClick, children, color }: { active?: boolean; o
   );
 }
 
+/** Seletor segmentado: a pílula lima desliza para a opção escolhida (mola, sem ressalto). */
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void }) {
+  const pill = useId();
   return (
     <div className="segmented" role="tablist">
       {options.map((o) => (
         <button key={o.value} role="tab" aria-selected={o.value === value} className={o.value === value ? 'on' : ''} onClick={() => onChange(o.value)}>
-          {o.label}
+          {o.value === value && <m.span layoutId={pill} className="seg-pill" transition={motionTokens.spring.morph} aria-hidden />}
+          <span className="seg-label">{o.label}</span>
         </button>
       ))}
     </div>

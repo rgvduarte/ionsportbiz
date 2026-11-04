@@ -1,0 +1,13 @@
+/* AnimatedCounter (adaptado da Arc, MIT). Cada algarismo é uma roda recortada; a janela passa um pouco da linha
+   e esbate nas pontas, para o algarismo a girar desvanecer em vez de ser cortado. */
+.mc-counter { position: relative; display: inline-flex; font-variant-numeric: tabular-nums; line-height: 1; }
+.mc-value { display: inline-flex; align-items: flex-start; white-space: nowrap; user-select: none; }
+.mc-column {
+  --feather: 0.16em;
+  position: relative; display: inline-block; overflow: hidden;
+  margin-block: calc(var(--feather) * -1); padding-block: var(--feather);
+  mask-image: linear-gradient(to bottom, transparent, #000 calc(var(--feather) * 1.5), #000 calc(100% - var(--feather) * 1.5), transparent);
+}
+.mc-sizer { visibility: hidden; }
+.mc-glyph { position: absolute; inset: var(--feather) 0; text-align: center; }
+.mc-symbol { display: inline-block; overflow-x: clip; }

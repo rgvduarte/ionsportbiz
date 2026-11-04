@@ -101,7 +101,9 @@
 }
 .ev .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: var(--tabbar-h); color: #7c7c7c; font-size: 0.68rem; font-weight: 600; }
 .ev .tab.active { color: var(--lime); }
-.ev .tab-icon { position: relative; display: grid; place-items: center; }
+.ev .tab-icon { position: relative; display: grid; place-items: center; isolation: isolate; }
+/* Destaque do separador ativo: desliza entre separadores (layoutId, ver TabBar). */
+.ev .tab-ind { position: absolute; inset: -5px -17px; border-radius: 999px; background: rgba(204, 255, 0, 0.14); z-index: -1; }
 .ev .badge { position: absolute; top: -6px; right: -10px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font-size: 0.68rem; font-weight: 800; display: grid; place-items: center; }
 .ev .tab-pass { justify-content: flex-end; padding-bottom: 9px; }
 .ev .pass-bubble {
@@ -130,7 +132,11 @@
 
 .ev .segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface-2); border-radius: 999px; padding: 4px; margin: 14px 0; }
 .ev .segmented button { height: 38px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.ev .segmented button.on { background: var(--lime); color: #000; }
+.ev .segmented button { position: relative; transition: color 0.2s ease; }
+.ev .segmented button.on { color: #000; }
+/* Pílula lima que desliza para a opção escolhida (layoutId, ver Segmented). */
+.ev .seg-pill { position: absolute; inset: 0; border-radius: 999px; background: var(--lime); }
+.ev .seg-label { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .ev .seg-badge { min-width: 18px; height: 18px; border-radius: 9px; background: var(--red); color: #fff; font-size: 0.7rem; display: grid; place-items: center; padding: 0 4px; }
 
 .ev .search { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px; border-radius: 999px; background: var(--surface-2); color: var(--muted); margin-bottom: 12px; }
@@ -199,10 +205,43 @@
 .ev .greeting { font-size: 1.05rem; color: #d8d8d8; margin-bottom: 16px; }
 .ev .greeting strong { color: var(--text); }
 .ev .quick-sub { display: block; margin-top: 4px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0; opacity: 0.75; }
-.ev .countdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.ev .cd-cell { border: 1.5px solid var(--lime); border-radius: var(--radius-sm); padding: 10px 4px 8px; text-align: center; }
-.ev .cd-num { display: block; font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-variant-numeric: tabular-nums; }
+.ev .countdown { position: relative; }
+/* Painel de partidas (split-flap): placas escuras, faixas lima nos lados, segundos em lima. */
+.ev .cd-board {
+  --flap-w: clamp(20px, 7.2vw, 34px);
+  position: relative; display: flex; justify-content: space-between; gap: 6px;
+  padding: 14px 16px 10px; border-radius: var(--radius-sm);
+  background: linear-gradient(145deg, #0c0c0c 0%, #080808 50%, #0a0a0a 100%);
+  border: 1px solid #1c1c1c;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.ev .cd-board::before, .ev .cd-board::after {
+  content: ''; position: absolute; top: 14px; height: calc(var(--flap-w) * 1.42); width: 4px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--lime) 0%, rgba(204, 255, 0, 0.6) 40%, rgba(204, 255, 0, 0.4) 60%, rgba(204, 255, 0, 0.6) 100%);
+  box-shadow: 0 0 8px rgba(204, 255, 0, 0.3);
+}
+.ev .cd-board::before { left: 6px; }
+.ev .cd-board::after { right: 6px; }
+.ev .cd-group { display: grid; justify-items: center; gap: 8px; }
+.ev .cd-digits { display: flex; gap: 3px; }
 .ev .cd-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+.ev .cd-group:last-child .flap-half > span { color: var(--lime); }
+
+.ev .flap {
+  position: relative; display: block; width: var(--flap-w); height: calc(var(--flap-w) * 1.42); perspective: 300px;
+  font-size: calc(var(--flap-w) * 0.98); font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: #f4f4f4;
+}
+.ev .flap-half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; backface-visibility: hidden; }
+.ev .flap-top { top: 0; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, #1e1e1e 0%, #181818 100%); transform-origin: 50% 100%; }
+.ev .flap-bottom { bottom: 0; border-radius: 0 0 5px 5px; background: linear-gradient(180deg, #151515 0%, #111 100%); transform-origin: 50% 0; }
+.ev .flap-half > span { position: absolute; left: 0; right: 0; height: 200%; display: grid; place-items: center; }
+.ev .flap-top > span { top: 0; }
+.ev .flap-bottom > span { bottom: 0; color: #e2e2e2; }
+.ev .flap::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: rgba(0, 0, 0, 0.85); z-index: 3; }
+.ev .flap-fall { z-index: 2; background: linear-gradient(180deg, #232323 0%, #1a1a1a 100%); animation: ev-flap-fall calc(var(--flap-ms) * 0.5) ease-in forwards; }
+.ev .flap-land { z-index: 2; transform: rotateX(90deg); animation: ev-flap-land calc(var(--flap-ms) * 0.5) ease-out calc(var(--flap-ms) * 0.5) forwards; }
+@keyframes ev-flap-fall { from { transform: rotateX(0deg); } to { transform: rotateX(-90deg); } }
+@keyframes ev-flap-land { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }
 .ev .countdown-live { font-size: 1.6rem; font-weight: 800; color: var(--lime); }
 
 .ev .alert { display: flex; align-items: center; gap: 12px; margin: 0 20px; padding: 12px 16px; border-radius: var(--radius-sm); background: #1a0b09; border: 1px solid #5a1d18; color: #ffd1cc; font-weight: 600; font-size: 0.92rem; }
@@ -318,17 +357,51 @@
 /* ---------- credential ---------- */
 .ev .credential { display: grid; }
 .ev .pass {
-  position: relative; overflow: hidden; border-radius: 28px; padding: 22px 22px 20px; text-align: center;
+  position: relative; border-radius: 28px; padding: 22px 22px 20px; text-align: center;
   background: #0a0a0a; border: 1.5px solid var(--pass, var(--lime));
 }
 .ev .pass-vip { border: 0; background: linear-gradient(#0a0a0a, #0a0a0a) padding-box, var(--grad-diag) border-box; border: 2px solid transparent; }
+/* VIP: o contorno em gradiente ion desliza devagar, como uma película holográfica. */
+.ev .pass.pass-vip {
+  background: linear-gradient(#0a0a0a, #0a0a0a) padding-box, linear-gradient(115deg, #ccff00 0%, #e27a2c 25%, #ea4d3b 50%, #e27a2c 75%, #ccff00 100%) border-box;
+  background-size: 100% 100%, 300% 100%;
+  animation: ev-vip-border 7s ease-in-out infinite alternate;
+}
+@keyframes ev-vip-border { from { background-position: 0 0, 0% 0; } to { background-position: 0 0, 100% 0; } }
+/* Brilho que atravessa o passe (por trás do QR, que fica por cima e intacto para a leitura). */
+.ev .pass-foil { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; }
+.ev .pass-foil::before {
+  content: ''; position: absolute; top: -20%; bottom: -20%; left: 0; width: 45%;
+  background: linear-gradient(100deg, transparent 0%, rgba(204, 255, 0, 0.07) 35%, rgba(255, 255, 255, 0.1) 50%, rgba(234, 77, 59, 0.07) 65%, transparent 100%);
+  transform: translateX(-120%) skewX(-12deg);
+  animation: ev-foil 4.8s ease-in-out infinite;
+}
+@keyframes ev-foil { 0% { transform: translateX(-120%) skewX(-12deg); } 55%, 100% { transform: translateX(330%) skewX(-12deg); } }
+.ev .pass > :not(.pass-foil) { position: relative; z-index: 1; }
 .ev .pass-top { display: flex; justify-content: space-between; align-items: center; }
 .ev .pass-logo { height: 54px; width: auto; }
 .ev .pass-edition { height: 26px; width: auto; }
 .ev .pass-type { margin: 16px auto 14px; display: inline-block; max-width: 100%; padding: 6px 16px; border-radius: 999px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.8rem; background: var(--pass, var(--lime)); color: var(--pass-on, #000); overflow-wrap: anywhere; }
 .ev .pass-vip .pass-type { background: var(--grad); }
-.ev .pass-qr { background: #fff; border-radius: 20px; padding: 10px; width: fit-content; margin: 0 auto; }
+.ev .pass-qr { display: block; background: #fff; border-radius: 20px; padding: 10px; width: fit-content; margin: 0 auto; cursor: zoom-in; }
 .ev .pass-qr svg { display: block; }
+.ev .pass-qr-code { display: block; line-height: 0; }
+.ev .pass-qr-placeholder { display: block; width: 208px; height: 208px; }
+.ev .pass-qr-hint { position: absolute; right: -9px; bottom: -9px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #000; color: var(--lime); border: 1.5px solid var(--lime); }
+/* Faixa "credencial ativa": ponto a pulsar e relógio ao segundo (uma captura de ecrã fica parada). */
+.ev .pass-live { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 0.74rem; font-weight: 800; color: #cfcfcf; text-transform: uppercase; letter-spacing: 0.07em; }
+.ev .pass-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); animation: ev-live 1.6s ease-out infinite; }
+@keyframes ev-live { from { box-shadow: 0 0 0 0 rgba(204, 255, 0, 0.55); } to { box-shadow: 0 0 0 9px rgba(204, 255, 0, 0); } }
+.ev .pass-live-clock { margin-left: auto; color: var(--lime); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+/* QR em ecrã inteiro, fundo branco: mais brilho e um código maior para o leitor à entrada. */
+.ev .qr-zoom {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: calc(var(--safe-top) + 24px) 24px calc(var(--safe-bottom) + 24px); background: #fff; color: #000; cursor: zoom-out;
+}
+.ev .qr-zoom-code { display: block; line-height: 0; }
+.ev .qr-zoom-name { margin-top: 16px; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; text-align: center; }
+.ev .qr-zoom-code-id { font-weight: 700; letter-spacing: 0.12em; color: #444; }
+.ev .qr-zoom-close { position: absolute; top: calc(var(--safe-top) + 14px); right: 14px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #000; color: #fff; }
 .ev .pass-name { margin-top: 16px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
 .ev .pass-company { color: var(--muted); margin-top: 4px; }
 .ev .pass-id { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #333; display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
@@ -367,6 +440,10 @@
 .ev .step-dot { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; font-weight: 800; border: 1.5px solid #333; }
 .ev .cred-steps li.done { color: #d8d8d8; }
 .ev .cred-steps li.done .step-dot { background: var(--lime); border-color: var(--lime); color: #000; }
+.ev .cred-steps li.done .step-dot svg { animation: ev-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.ev .cred-steps li:nth-child(2) .step-dot svg { animation-delay: 0.08s; }
+.ev .cred-steps li:nth-child(3) .step-dot svg { animation-delay: 0.16s; }
+@keyframes ev-pop { from { transform: scale(0.4); opacity: 0; } }
 .ev .cred-steps li.current { color: var(--text); font-weight: 800; }
 .ev .cred-steps li.current .step-dot { border-color: var(--lime); color: var(--lime); box-shadow: 0 0 0 4px rgba(204, 255, 0, 0.12); }
 .ev .cred-steps li.failed .step-dot { border-color: var(--red); color: var(--red); }
@@ -547,6 +624,19 @@
 @media (min-width: 600px) {
   .ev .app { border-left: 1px solid #111; border-right: 1px solid #111; }
 }
+/* ---------- movimento ---------- */
+/* Cada ecrã entra num esbatimento curto (só opacidade: não cria contentor para os elementos fixos). */
+.ev .screen-in { animation: ev-screen-in 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes ev-screen-in { from { opacity: 0; } }
+.ev .icard { animation: ev-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes ev-rise { from { opacity: 0; transform: translateY(8px); } }
+/* Títulos que entram palavra a palavra (KineticText). */
+.ev .kt-mask { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.06em 0 0.14em; margin: -0.06em 0 -0.14em; }
+.ev .kt-word { display: inline-block; will-change: transform; }
+
 @media (prefers-reduced-motion: reduce) {
   .ev, .ev * { transition: none !important; }
+  .ev .pass-foil::before, .ev .pass-live-dot, .ev .pass.pass-vip, .ev .screen-in, .ev .icard, .ev .cred-steps .step-dot svg { animation: none; }
+  .ev .flap-fall { display: none; }
+  .ev .flap-land { animation: none; transform: none; }
 }

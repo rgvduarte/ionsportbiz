@@ -1,7 +1,8 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import { QRCodeSVG } from 'qrcode.react';
-import { CalendarPlus, Check, CheckCircle2, CircleSlash, Hourglass, MailCheck, Navigation, RefreshCw, SunMedium, TicketX, UserRoundX, WifiOff } from 'lucide-react';
+import { CalendarPlus, Check, CheckCircle2, CircleSlash, Hourglass, MailCheck, Maximize2, Navigation, RefreshCw, SunMedium, TicketX, UserRoundX, WifiOff, X } from 'lucide-react';
 import type { GuestView } from '../../lib/api/types';
 import { inviteUrl } from '../../lib/config';
 import { buildIcs, canDownloadIcs, downloadIcs, icsFilename } from '../../lib/ics';
@@ -15,6 +16,7 @@ import { calendarUid, eventIsPast, mapsUrl } from '../lib/rsvp';
 import { useProfile, useStore } from '../lib/store';
 import { useLiveRefresh } from '../lib/useLiveRefresh';
 import { asset } from '../lib/asset';
+import { ease, motionTokens } from '../../lib/motion/tokens';
 
 const STEPS: I18nKey[] = ['cred.step1', 'cred.step2', 'cred.step3', 'cred.step4'];
 
@@ -68,6 +70,65 @@ function contactHref(e: GuestView['event']): string {
   return e.contact_email ? `mailto:${e.contact_email}` : EVENT.contact;
 }
 
+/** Hora a contar ao segundo: numa captura de ecrã fica parada, o que denuncia uma credencial copiada. */
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return now;
+}
+
+/** Faixa "credencial ativa": ponto a pulsar e relógio ao segundo. A equipa à porta vê que é a app, não uma imagem. */
+function LiveStrip() {
+  const { t, locale } = useI18n();
+  const now = useClock();
+  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(now);
+  return (
+    <div className="pass-live">
+      <span className="pass-live-dot" aria-hidden />
+      <span>{t('cred.live')}</span>
+      <time className="pass-live-clock" dateTime={now.toISOString()}>{time}</time>
+    </div>
+  );
+}
+
+/** QR em ecrã inteiro, em fundo branco (mais brilho e um código maior para o leitor à entrada). */
+function QrZoom({ code, name, onClose }: { code: string; name: string; onClose: () => void }) {
+  const { t } = useI18n();
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => { close.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const size = Math.min(window.innerWidth - 64, 360);
+  return (
+    <m.div
+      className="qr-zoom"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('cred.code')}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: motionTokens.duration.standard }}
+      onClick={onClose}
+    >
+      <m.div layoutId="pass-qr" className="qr-zoom-code" transition={motionTokens.spring.morph}>
+        <QRCodeSVG value={code} size={size} level="H" bgColor="#FFFFFF" fgColor="#000000" marginSize={2} />
+      </m.div>
+      <p className="qr-zoom-name">{name}</p>
+      <p className="qr-zoom-code-id">{groupCode(code)}</p>
+      <button ref={close} type="button" className="qr-zoom-close" aria-label={t('cred.closeZoom')} onClick={onClose}>
+        <X size={22} />
+      </button>
+    </m.div>
+  );
+}
+
 /** Credencial aprovada: o passe com o QR code real e os acessos atribuídos pela equipa. */
 function Pass({ view, actions }: { view: GuestView; actions?: ReactNode }) {
   const { t, locale } = useI18n();
@@ -80,17 +141,39 @@ function Pass({ view, actions }: { view: GuestView; actions?: ReactNode }) {
   const style = !vip && colors ? ({ ['--pass' as string]: colors.accent, ['--pass-on' as string]: colors.on } as CSSProperties) : undefined;
   const sub = [p.role, p.company].filter(Boolean).join(' · ');
 
+  const [zoom, setZoom] = useState(false);
+  const qrButton = useRef<HTMLButtonElement>(null);
+  const closeZoom = () => {
+    setZoom(false);
+    qrButton.current?.focus();
+  };
+
   return (
     <>
-      <div className={`pass${vip ? ' pass-vip' : ''}`} style={style}>
+      {/* Entrada do passe: sobe e assenta (mola), com o conteúdo em cascata. */}
+      <m.div
+        className={`pass${vip ? ' pass-vip' : ''}`}
+        style={style}
+        initial={{ opacity: 0, y: 28, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ ...motionTokens.spring.smooth, visualDuration: motionTokens.duration.considered }}
+      >
+        <span className="pass-foil" aria-hidden />
         <div className="pass-top">
           <img src={asset('images/logo-full.webp')} alt="ion" className="pass-logo" />
           <img src={asset('images/pt-27.webp')} alt="PT ’27" className="pass-edition" />
         </div>
         <div className="pass-type">{pass?.name ?? t('cred.guest')}</div>
-        <div className="pass-qr">
-          <QRCodeSVG value={code} size={208} level="H" bgColor="#FFFFFF" fgColor="#000000" marginSize={2} title={`${t('cred.code')}: ${groupCode(code)}`} />
-        </div>
+        <button ref={qrButton} type="button" className="pass-qr" onClick={() => setZoom(true)} aria-label={t('cred.enlarge')}>
+          {zoom ? (
+            <span className="pass-qr-placeholder" />
+          ) : (
+            <m.span layoutId="pass-qr" className="pass-qr-code" transition={motionTokens.spring.morph}>
+              <QRCodeSVG value={code} size={208} level="H" bgColor="#FFFFFF" fgColor="#000000" marginSize={2} title={`${t('cred.code')}: ${groupCode(code)}`} />
+            </m.span>
+          )}
+          <span className="pass-qr-hint" aria-hidden><Maximize2 size={14} /></span>
+        </button>
         <div className="pass-name">{p.name}</div>
         {sub && <div className="pass-company">{sub}</div>}
         {inv.companions.length > 0 && (
@@ -102,7 +185,10 @@ function Pass({ view, actions }: { view: GuestView; actions?: ReactNode }) {
           <span>{t('cred.code')}</span>
           <code>{groupCode(code)}</code>
         </div>
-      </div>
+        {!inv.checked_in_at && <LiveStrip />}
+      </m.div>
+
+      <AnimatePresence>{zoom && <QrZoom code={code} name={p.name} onClose={closeZoom} />}</AnimatePresence>
 
       {inv.checked_in_at ? (
         <p className="hint hint-ok">
@@ -204,6 +290,13 @@ export default function Credential() {
   const token = state.token!;
   const cs = stateOf(view);
   useLiveRefresh(cs === 'pending' || cs === 'unconfirmed');
+  const toast = useToast();
+  // Aprovado enquanto o convidado tinha o ecrã aberto: avisa (o passe entra com animação).
+  const lastState = useRef(cs);
+  useEffect(() => {
+    if (lastState.current === 'pending' && cs === 'approved') toast(t('cred.approvedNow'));
+    lastState.current = cs;
+  }, [cs, toast, t]);
 
   const loading = sync === 'loading';
   const refreshBtn = (
@@ -314,7 +407,18 @@ export default function Credential() {
             </span>
           </p>
         )}
-        {body}
+        <AnimatePresence mode="wait" initial={false}>
+          <m.div
+            key={cs ?? sync}
+            className="cred-body"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8, transition: { duration: motionTokens.duration.exit, ease: ease(motionTokens.ease.exit) } }}
+            transition={{ duration: motionTokens.duration.standard, ease: ease(motionTokens.ease.enter) }}
+          >
+            {body}
+          </m.div>
+        </AnimatePresence>
       </main>
     </>
   );
