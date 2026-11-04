@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { InvitationRow } from '../../lib/api';
 import { renderMessage, buildTemplateVars } from '@shared/template';
 import {
+  hasCredential, missingDefaults, pickTemplate, templateKind,
   attendanceCsv, attendanceFileName, capacityExcess, countByApproval, countByStatus, defaultTemplates, filterRows, headcount, matchesSearch,
   NO_WAVE, personalMessage, recipients, runBulk, whatsappBody,
 } from './guestList';
@@ -155,6 +156,23 @@ describe('modelos sugeridos', () => {
     const own = { id: 't', event_id: 'e', channel: 'whatsapp' as const, name: 'X', subject: null, body: 'Olá {{nome}}', created_at: '', updated_at: '' };
     expect(whatsappBody([own], event)).toBe('Olá {{nome}}');
     expect(whatsappBody([], event)).toBe(defaultTemplates(event)[1].body);
+  });
+
+  it('distingue o convite do aviso «Credencial pronta»', () => {
+    const tpl = (channel: 'email' | 'whatsapp', name: string) => ({ id: name, event_id: 'e', channel, name, subject: null, body: name, created_at: '', updated_at: '' });
+    const credWa = tpl('whatsapp', 'Credencial pronta (WhatsApp)');
+    const inviteWa = tpl('whatsapp', 'Convite');
+    expect(templateKind(credWa)).toBe('credential');
+    expect(templateKind(inviteWa)).toBe('invite');
+    // O aviso não substitui o convite, mesmo sendo o primeiro da lista.
+    expect(whatsappBody([credWa, inviteWa], event)).toBe('Convite');
+    expect(whatsappBody([credWa, inviteWa], event, 'credential')).toBe('Credencial pronta (WhatsApp)');
+    expect(whatsappBody([inviteWa], event, 'credential')).toBe(defaultTemplates(event)[3].body);
+    expect(pickTemplate([tpl('email', 'Convite formal'), tpl('email', 'Credencial pronta')], 'credential')?.name).toBe('Credencial pronta');
+    expect(missingDefaults([tpl('email', 'Convite VIP'), credWa], event).map((d) => d.name)).toEqual(['Convite por WhatsApp', 'Credencial pronta']);
+    expect(missingDefaults([], event)).toHaveLength(4);
+    expect(hasCredential({ status: 'accepted', approval_status: 'approved' })).toBe(true);
+    expect(hasCredential({ status: 'sent', approval_status: 'approved' })).toBe(false);
   });
 });
 

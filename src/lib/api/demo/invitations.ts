@@ -100,6 +100,43 @@ function decide(ids: string[], apply: (inv: DemoInvitation) => boolean, kind: st
   return n;
 }
 
+/**
+ * Aprova com um tipo de acesso, como approve_invitations: tipo do mesmo evento, recusados/cancelados de fora,
+ * e a quota (aprovados ativos, pré-aprovados incluídos) não pode ser ultrapassada.
+ */
+export function approveWith(ids: string[], passTypeId: string, actorId: string | null): number {
+  const d = getDb();
+  const pass = d.passTypes.find((p) => p.id === passTypeId);
+  if (!pass || d.invitations.some((i) => ids.includes(i.id) && i.event_id !== pass.event_id)) throw new ApiError('invalid_pass_type');
+  const active = (i: DemoInvitation) => i.status !== 'cancelled' && i.status !== 'declined';
+  const changes = (i: DemoInvitation) => active(i) && !(i.approval_status === 'approved' && i.pass_type_id === pass.id);
+  if (pass.capacity != null) {
+    const set = new Set(ids);
+    const requested = d.invitations.filter((i) => set.has(i.id) && i.event_id === pass.event_id && changes(i)).length;
+    const used = d.invitations.filter((i) => i.pass_type_id === pass.id && i.approval_status === 'approved' && active(i)).length;
+    if (requested > 0 && used + requested > pass.capacity) {
+      throw new ApiError('pass_quota', JSON.stringify({ pass_type: pass.name, capacity: pass.capacity, used, requested }));
+    }
+  }
+  return decide(ids, (inv) => {
+    if (!changes(inv)) return false;
+    Object.assign(inv, { approval_status: 'approved', pass_type_id: pass.id, approved_at: nowIso(), approved_by: actorId });
+    return true;
+  }, 'invitation.approved', { pass_type: pass.name });
+}
+
+/** Corre `fn` e, se falhar, repõe os dados como estavam (a transação do Postgres). */
+export function atomically<T>(fn: () => T): T {
+  const d = getDb();
+  const before = structuredClone(d);
+  try {
+    return fn();
+  } catch (err) {
+    Object.assign(d, before);
+    throw err;
+  }
+}
+
 export const invitations: Api['invitations'] = {
   async list(eventId, q) {
     requireRole(...CAN_READ_CRM);
@@ -136,25 +173,31 @@ export const invitations: Api['invitations'] = {
     const ids = [...new Set(contactIds)];
     if (ids.some((id) => !d.contacts.some((c) => c.id === id))) throw new ApiError('validation', 'invitations_contact_id_fkey');
 
-    let created = 0;
-    for (const contactId of ids) {
-      // on conflict (event_id, contact_id) do nothing
-      if (d.invitations.some((i) => i.event_id === eventId && i.contact_id === contactId)) continue;
-      const now = nowIso();
-      const inv: DemoInvitation = {
-        id: uid(), event_id: eventId, contact_id: contactId, token: newToken(), checkin_code: newCheckinCode(),
-        status: 'draft', wave, plus_ones_allowed: plusOnes, invited_by: me.user_id,
-        sent_at: null, sent_channel: null, first_opened_at: null, last_opened_at: null, open_count: 0,
-        responded_at: null, answers: {}, guest_note: null, checked_in_at: null, checked_in_by: null,
-        approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null,
-        created_at: now, updated_at: now,
-      };
-      d.invitations.push(inv);
-      logActivity({ kind: 'invitation.created', contact_id: contactId, invitation_id: inv.id, event_id: eventId, channel: null, detail: { wave } });
-      created++;
-    }
+    // Tudo ou nada, como a transação de invite_contacts: se a pré-aprovação falhar (quota), nenhum convite fica.
+    const n = atomically(() => {
+      const createdIds: string[] = [];
+      for (const contactId of ids) {
+        // on conflict (event_id, contact_id) do nothing; contactos anonimizados ficam de fora.
+        if (d.invitations.some((i) => i.event_id === eventId && i.contact_id === contactId)) continue;
+        if (d.contacts.find((c) => c.id === contactId)?.anonymized_at) continue;
+        const now = nowIso();
+        const inv: DemoInvitation = {
+          id: uid(), event_id: eventId, contact_id: contactId, token: newToken(), checkin_code: newCheckinCode(),
+          status: 'draft', wave, plus_ones_allowed: plusOnes, invited_by: me.user_id,
+          sent_at: null, sent_channel: null, first_opened_at: null, last_opened_at: null, open_count: 0,
+          responded_at: null, answers: {}, guest_note: null, checked_in_at: null, checked_in_by: null,
+          approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null,
+          created_at: now, updated_at: now,
+        };
+        d.invitations.push(inv);
+        logActivity({ kind: 'invitation.created', contact_id: contactId, invitation_id: inv.id, event_id: eventId, channel: null, detail: { wave } });
+        createdIds.push(inv.id);
+      }
+      if (opts?.passTypeId && createdIds.length) approveWith(createdIds, opts.passTypeId, me.user_id);
+      return createdIds.length;
+    });
     save();
-    return delay(created, 300);
+    return delay(n, 300);
   },
 
   async update(id, patch) {
@@ -208,15 +251,7 @@ export const invitations: Api['invitations'] = {
 
   async approve(ids, passTypeId) {
     const me = requireRole(...CAN_EDIT);
-    const d = getDb();
-    const pass = d.passTypes.find((p) => p.id === passTypeId);
-    if (!pass || d.invitations.some((i) => ids.includes(i.id) && i.event_id !== pass.event_id)) throw new ApiError('invalid_pass_type');
-    const n = decide(ids, (inv) => {
-      if (inv.status === 'cancelled' || inv.status === 'declined') return false;
-      if (inv.approval_status === 'approved' && inv.pass_type_id === pass.id) return false;
-      Object.assign(inv, { approval_status: 'approved', pass_type_id: pass.id, approved_at: nowIso(), approved_by: me.user_id });
-      return true;
-    }, 'invitation.approved', { pass_type: pass.name });
+    const n = approveWith(ids, passTypeId, me.user_id);
     return delay(n, 250);
   },
 

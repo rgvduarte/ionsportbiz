@@ -2,11 +2,12 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { Check, Ticket, X } from 'lucide-react';
 import { api, type EventRecord, type InvitationRow, type PassType } from '../../lib/api';
-import { formalName } from '../../lib/format';
+import { formalName, formatNumber } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { Alert, Button, ButtonLink, Dialog, Field, LoadError, Skeleton, Textarea, useToast } from '../../ui';
 import { AccessList, passColor, PassChip } from '../passes';
 import { approvePlan, rejectPlan } from './approval';
+import { quotaLeft, quotaNeeded, quotaShortMessage } from '../events/passTypes';
 import { plural } from './parts';
 
 // Aprovar (com tipo de acesso) e não aprovar: para a seleção da lista e para a ficha de um convidado.
@@ -20,14 +21,28 @@ function initialPass(rows: InvitationRow[], types: PassType[]): string | null {
   return types.length === 1 ? types[0].id : null;
 }
 
-export function ApproveDialog({ event, rows, onClose, onDone }: {
+/** Lugares livres da quota de um tipo de acesso. */
+function QuotaLine({ capacity, left }: { capacity: number; left: number }) {
+  const free = Math.max(0, left);
+  return (
+    <span className={['apv-quota', free === 0 && 'is-full'].filter(Boolean).join(' ')}>
+      {free === 0 ? 'Quota esgotada' : `${free === 1 ? '1 lugar livre' : `${formatNumber(free)} lugares livres`}`} · quota {formatNumber(capacity)}
+    </span>
+  );
+}
+
+export function ApproveDialog({ event, rows, allRows, onClose, onDone }: {
   event: EventRecord;
   rows: InvitationRow[];
+  /** Todos os convites do evento, para as quotas (se faltar, carregam-se aqui). */
+  allRows?: InvitationRow[];
   onClose: () => void;
   onDone: (changed: number, pass: PassType) => void;
 }) {
   const toast = useToast();
   const types = useAsync(() => api.passTypes.list(event.id), [event.id]);
+  const loaded = useAsync(() => (allRows ? Promise.resolve(allRows) : api.invitations.list(event.id).catch(() => null)), [event.id, allRows]);
+  const quotaRows = allRows ?? loaded.data ?? null;
   const [chosen, setChosen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -38,11 +53,15 @@ export function ApproveDialog({ event, rows, onClose, onDone }: {
   const pass = list.find((t) => t.id === chosen) ?? null;
   const plan = approvePlan(rows, chosen);
   const single = rows.length === 1 ? rows[0] : null;
+  // Quota do tipo escolhido: os que mudam para ele não podem passar dos lugares livres.
+  const left = pass && quotaRows ? quotaLeft(pass, quotaRows) : null;
+  const needed = pass ? quotaNeeded(rows, pass.id) : 0;
+  const overQuota = pass && left !== null && needed > left ? quotaShortMessage(pass, left, needed) : null;
   const retype = single?.approval_status === 'approved';
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!pass || !plan.change.length) return;
+    if (!pass || !plan.change.length || overQuota) return;
     setSaving(true);
     try {
       const n = await api.invitations.approve(plan.change.map((r) => r.id), pass.id);
@@ -91,6 +110,7 @@ export function ApproveDialog({ event, rows, onClose, onDone }: {
               <input type="radio" name="apv-pass" checked={chosen === t.id} onChange={() => setChosen(t.id)} />
               <span className="apv-option__body">
                 <PassChip name={t.name} color={t.color} />
+                {t.capacity != null && quotaRows && <QuotaLine capacity={t.capacity} left={quotaLeft(t, quotaRows) ?? 0} />}
                 {t.description && <span className="apv-option__desc">{t.description}</span>}
                 <AccessList accesses={t.accesses} />
               </span>
@@ -103,6 +123,7 @@ export function ApproveDialog({ event, rows, onClose, onDone }: {
         {(single?.status === 'declined' || single?.status === 'cancelled') && (
           <Alert tone="warning">{single.status === 'declined' ? 'Este convidado recusou o convite.' : 'Este convite está cancelado.'} Não é possível aprová-lo.</Alert>
         )}
+        {overQuota && <Alert tone="danger">{overQuota} Aumente a quota em Acessos ou escolha menos convidados.</Alert>}
         {summary.length > 0 && (
           <ul className="apv-summary" aria-live="polite">
             {summary.map((s) => <li key={s}>{s}</li>)}
@@ -134,7 +155,7 @@ export function ApproveDialog({ event, rows, onClose, onDone }: {
       ) : (
         <>
           <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" type="submit" form="apv-form" icon={<Check />} loading={saving} disabled={!pass || !plan.change.length}>
+          <Button variant="primary" type="submit" form="apv-form" icon={<Check />} loading={saving} disabled={!pass || !plan.change.length || !!overQuota}>
             {pass
               ? plan.change.length
                 ? `${retype ? 'Mudar para' : 'Aprovar com'} ${pass.name}${!single && plan.change.length !== rows.length ? ` (${plan.change.length})` : ''}`

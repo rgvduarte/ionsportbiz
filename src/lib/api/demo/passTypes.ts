@@ -9,6 +9,8 @@ function validate(input: Partial<PassType>): void {
   if (!name || name.length > 80) throw new ApiError('validation', 'pass_types_name_check', 'Indique um nome com até 80 caracteres.');
   if (input.color && !/^#[0-9a-fA-F]{6}$/.test(input.color)) throw new ApiError('validation', 'pass_types_color_check', 'Use uma cor no formato #RRGGBB.');
   if ((input.description ?? '').length > 500) throw new ApiError('validation', 'pass_types_description_check', 'A descrição tem mais de 500 caracteres.');
+  const cap = input.capacity;
+  if (cap != null && (!Number.isInteger(cap) || cap < 1 || cap > 100000)) throw new ApiError('validation', 'pass_types_capacity_check', 'A quota tem de ser um número inteiro a partir de 1.');
 }
 
 export const passTypes: Api['passTypes'] = {
@@ -34,6 +36,7 @@ export const passTypes: Api['passTypes'] = {
       accesses: input.accesses.map((a) => a.trim()).filter(Boolean),
       color: input.color || null,
       sort: input.sort,
+      capacity: input.capacity ?? null,
     };
     let row: PassType;
     if (input.id) {

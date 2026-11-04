@@ -1,11 +1,12 @@
 // Tipos de acesso (sem React): valores do formulário, validação, sugestões e conversão para PassTypeInput.
 
-import type { PassType, PassTypeInput } from '../../lib/api/types';
+import type { Invitation, PassType, PassTypeInput } from '../../lib/api/types';
 import { isHexColor } from './eventForm';
 
 export const NAME_MAX = 80;
 export const DESCRIPTION_MAX = 500;
 export const ACCESS_MAX = 120;
+export const QUOTA_MAX = 100000;
 
 /** Cores sugeridas: as da marca ion e alguns tons que se distinguem bem sobre fundo escuro. */
 export const PASS_COLORS = ['#ccff00', '#e27a2c', '#ea4d3b', '#7aa7ff', '#b38cff', '#4ade80', '#f4f4f4'];
@@ -17,12 +18,14 @@ export const SUGGESTED_PASS_TYPES: Omit<PassTypeInput, 'event_id' | 'sort'>[] = 
     description: 'Acesso a todo o programa, incluindo o jantar de gala e o almoço VIP.',
     accesses: ['VIP Gala Dinner', 'Cerimónia dos ion Awards', 'ion Conference', 'VIP Lunch'],
     color: '#ccff00',
+    capacity: null,
   },
   {
     name: 'Conference Pass',
     description: 'Acesso à ion Conference.',
     accesses: ['ion Conference'],
     color: '#e27a2c',
+    capacity: null,
   },
 ];
 
@@ -36,6 +39,8 @@ export interface PassTypeFormValues {
   /** #rrggbb ou vazio (sem cor). */
   color: string;
   sort: string;
+  /** Máximo de convites aprovados; vazio = sem limite. */
+  capacity: string;
 }
 
 /** Ordem para um tipo novo: a seguir ao último. */
@@ -56,6 +61,7 @@ export function toPassTypeForm(p: PassType | null, others: PassType[] = []): Pas
     accesses: p ? [...p.accesses] : [],
     color: p ? p.color ?? '' : unusedColor(others),
     sort: String(p?.sort ?? nextSort(others)),
+    capacity: p?.capacity ? String(p.capacity) : '',
   };
 }
 
@@ -93,7 +99,7 @@ export function moveItem<T>(list: T[], index: number, dir: -1 | 1): T[] {
   return next;
 }
 
-export type PassTypeErrors = Partial<Record<'name' | 'description' | 'accesses' | 'color' | 'sort', string>>;
+export type PassTypeErrors = Partial<Record<'name' | 'description' | 'accesses' | 'color' | 'sort' | 'capacity', string>>;
 
 /** `others`: os restantes tipos do evento (o nome não se pode repetir). */
 export function validatePassType(v: PassTypeFormValues, others: Pick<PassType, 'name'>[]): PassTypeErrors {
@@ -107,6 +113,8 @@ export function validatePassType(v: PassTypeFormValues, others: Pick<PassType, '
   if (v.color && !isHexColor(v.color)) e.color = 'Use o formato #RRGGBB, por exemplo #CCFF00.';
   const sort = Number(v.sort);
   if (v.sort.trim() === '' || !Number.isInteger(sort) || sort < 0 || sort > 999) e.sort = 'Indique um número inteiro entre 0 e 999.';
+  const cap = Number(v.capacity);
+  if (v.capacity.trim() !== '' && (!Number.isInteger(cap) || cap < 1 || cap > QUOTA_MAX)) e.capacity = 'Indique um número inteiro a partir de 1, ou deixe vazio para não limitar.';
   return e;
 }
 
@@ -119,5 +127,37 @@ export function toPassTypeInput(v: PassTypeFormValues, eventId: string, id?: str
     accesses: cleanAccesses(v.accesses),
     color: v.color ? v.color.toLowerCase() : null,
     sort: Number(v.sort),
+    capacity: v.capacity.trim() ? Number(v.capacity) : null,
   };
+}
+
+// ───────── Quota (as mesmas regras de approve_invitations) ─────────
+
+type QuotaFields = Pick<Invitation, 'status' | 'approval_status' | 'pass_type_id'>;
+
+const active = (r: Pick<Invitation, 'status'>) => r.status !== 'declined' && r.status !== 'cancelled';
+
+/** Ocupa um lugar da quota: aprovado com este tipo e sem recusa nem cancelamento (os pré-aprovados contam). */
+export function holdsQuota(r: QuotaFields, passTypeId: string): boolean {
+  return active(r) && r.approval_status === 'approved' && r.pass_type_id === passTypeId;
+}
+
+export function quotaUsed(rows: QuotaFields[], passTypeId: string): number {
+  return rows.filter((r) => holdsQuota(r, passTypeId)).length;
+}
+
+/** Lugares livres (pode ser negativo se a quota foi reduzida abaixo do usado); null = sem limite. */
+export function quotaLeft(pass: Pick<PassType, 'id' | 'capacity'>, rows: QuotaFields[]): number | null {
+  return pass.capacity == null ? null : pass.capacity - quotaUsed(rows, pass.id);
+}
+
+/** Quantos dos selecionados passariam a ocupar a quota deste tipo (os que já o têm não contam). */
+export function quotaNeeded(selected: QuotaFields[], passTypeId: string): number {
+  return selected.filter((r) => active(r) && !holdsQuota(r, passTypeId)).length;
+}
+
+/** Frase para quando a quota não chega. */
+export function quotaShortMessage(pass: Pick<PassType, 'name' | 'capacity'>, left: number, needed: number): string {
+  const free = Math.max(0, left);
+  return `${pass.name} tem quota de ${pass.capacity}: ${free === 0 ? 'não há lugares livres' : free === 1 ? 'resta 1 lugar' : `restam ${free} lugares`} e ${needed === 1 ? 'precisa de 1' : `precisa de ${needed}`}.`;
 }

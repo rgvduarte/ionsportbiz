@@ -11,8 +11,10 @@ import { AuthProvider } from './app/AuthProvider';
 import { initNative } from './native/init';
 import { consumeAuthRedirect } from './lib/authRedirect';
 import { MotionRoot } from './lib/motion/MotionRoot';
+import { initPwa } from './lib/pwa';
 
 void initNative();
+initPwa();
 
 // Um separador aberto durante uma publicação nova pode pedir ficheiros que já não existem, ou a rede falha a meio
 // (vite:preloadError). Recarrega uma vez para obter a versão atual; a marca evita ciclos e expira passados 30 s.

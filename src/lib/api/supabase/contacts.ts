@@ -118,6 +118,7 @@ export const contacts: Api['contacts'] & ErasureRequestsApi = {
       p_event_id: opts?.eventId ?? null,
       p_wave: opts?.wave?.trim() || null,
       p_plus_ones: opts?.plusOnes ?? null,
+      p_pass_type_id: opts?.passTypeId ?? null,
     });
     check(res);
     const data = res.data as Partial<ImportResult> | null;

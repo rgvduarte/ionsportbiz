@@ -78,13 +78,14 @@ export const invitations: Api['invitations'] = {
       plusOnes = (event as { default_plus_ones: number }).default_plus_ones;
     }
     const wave = blank(opts?.wave);
+    // invite_contacts: cria e, com tipo de acesso, pré-aprova na mesma transação (respeita a quota).
     let created = 0;
-    for (const part of chunks(ids, 500)) {
-      const rows = part.map((contact_id) => ({ event_id: eventId, contact_id, wave, plus_ones_allowed: plusOnes }));
-      const inserted = must(
-        await supabase.from('invitations').upsert(rows, { onConflict: 'event_id,contact_id', ignoreDuplicates: true }).select('id'),
-      );
-      created += inserted.length;
+    for (const part of chunks(ids, 5000)) {
+      const res = await supabase.rpc('invite_contacts', {
+        p_event_id: eventId, p_contact_ids: part, p_wave: wave, p_plus_ones: plusOnes, p_pass_type_id: opts?.passTypeId ?? null,
+      });
+      check(res);
+      created += (res.data as number | null) ?? 0;
     }
     return created;
   },

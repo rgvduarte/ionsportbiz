@@ -89,6 +89,23 @@ describe('contactos (modo demonstração)', () => {
     expect(again).toMatchObject({ inserted: 0, updated: 1, invited: 0 });
   });
 
+  it('importa com pré-aprovação; se a quota não chegar, nada fica importado', async () => {
+    const VIP = '00000000-0000-4000-8000-0000000009a1';
+    const r = await contacts.import([{ first_name: 'Vera', email: 'vera@exemplo.pt' }], { eventId: MAIN, passTypeId: VIP });
+    expect(r.invited).toBe(1);
+    const vera = getDb().contacts.find((c) => c.email === 'vera@exemplo.pt')!;
+    expect(getDb().invitations.find((i) => i.contact_id === vera.id)).toMatchObject({ approval_status: 'approved', pass_type_id: VIP });
+
+    const pass = getDb().passTypes.find((p) => p.id === VIP)!;
+    pass.capacity = getDb().invitations.filter((i) => i.pass_type_id === VIP && i.approval_status === 'approved'
+      && i.status !== 'declined' && i.status !== 'cancelled').length;
+    const before = getDb().contacts.length;
+    await expect(contacts.import([{ first_name: 'Rui', email: 'rui@exemplo.pt' }], { eventId: MAIN, passTypeId: VIP }))
+      .rejects.toMatchObject({ code: 'pass_quota' });
+    expect(getDb().contacts.length).toBe(before);
+    await expect(contacts.import([{ first_name: 'Rui' }], { passTypeId: VIP })).rejects.toMatchObject({ code: 'invalid_pass_type' });
+  });
+
   it('apaga os dados pessoais como a função anonymize_contact', async () => {
     const inv = getDb().invitations.find((i) => i.event_id === MAIN && i.status === 'accepted')!;
     const id = inv.contact_id;

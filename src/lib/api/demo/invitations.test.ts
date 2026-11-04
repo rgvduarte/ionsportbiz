@@ -77,6 +77,46 @@ describe('demo invitations.create', () => {
   });
 });
 
+describe('demo quota por tipo de acesso', () => {
+  const VIP = '00000000-0000-4000-8000-0000000009a1';
+  const CONF = '00000000-0000-4000-8000-0000000009a2';
+  const vipUsed = () => getDb().invitations.filter((i) => i.pass_type_id === VIP && i.approval_status === 'approved'
+    && i.status !== 'declined' && i.status !== 'cancelled').length;
+  const freshContacts = (n: number) => {
+    const d = getDb();
+    const invited = new Set(d.invitations.filter((i) => i.event_id === MAIN).map((i) => i.contact_id));
+    return d.contacts.filter((c) => !invited.has(c.id) && !c.anonymized_at).slice(0, n).map((c) => c.id);
+  };
+  const setVipCapacity = (capacity: number | null) => { getDb().passTypes.find((p) => p.id === VIP)!.capacity = capacity; };
+
+  it('convida e pré-aprova com o tipo de acesso', async () => {
+    const ids = freshContacts(2);
+    expect(await invitations.create(MAIN, ids, { passTypeId: CONF })).toBe(2);
+    const created = getDb().invitations.filter((i) => i.event_id === MAIN && ids.includes(i.contact_id));
+    expect(created.every((i) => i.approval_status === 'approved' && i.pass_type_id === CONF && i.status === 'draft')).toBe(true);
+    expect(kindsOf(created[0].id)).toEqual(['invitation.created', 'invitation.approved']);
+  });
+
+  it('quota cheia: nenhum convite é criado', async () => {
+    setVipCapacity(vipUsed() + 1);
+    const ids = freshContacts(2);
+    const before = getDb().invitations.length;
+    await expect(invitations.create(MAIN, ids, { passTypeId: VIP })).rejects.toMatchObject({ code: 'pass_quota' });
+    expect(getDb().invitations.length).toBe(before);
+    expect(await invitations.create(MAIN, ids.slice(0, 1), { passTypeId: VIP })).toBe(1);
+    expect(vipUsed()).toBe(getDb().passTypes.find((p) => p.id === VIP)!.capacity);
+  });
+
+  it('aprovar acima da quota é recusado; sem quota não há limite', async () => {
+    setVipCapacity(vipUsed());
+    const pending = getDb().invitations.filter((i) => i.event_id === MAIN && i.status === 'accepted' && i.approval_status === 'pending');
+    await expect(invitations.approve([pending[0].id], VIP)).rejects.toMatchObject({ code: 'pass_quota' });
+    expect(getDb().invitations.find((i) => i.id === pending[0].id)!.approval_status).toBe('pending');
+    setVipCapacity(null);
+    expect(await invitations.approve([pending[0].id], VIP)).toBe(1);
+  });
+});
+
 describe('demo invitations.markSent', () => {
   it('imita mark_sent: rascunho passa a enviado, reenvio fica registado, cancelado não muda', async () => {
     const d = getDb();
@@ -178,7 +218,9 @@ describe('demo invitations.waves / activities', () => {
 describe('demo templates', () => {
   it('lista por canal (ordem do enum) e nome', async () => {
     const rows = await templates.list(MAIN);
-    expect(rows.map((t) => `${t.channel}:${t.name}`)).toEqual(['email:Convite formal', 'email:Lembrete', 'whatsapp:Convite WhatsApp']);
+    expect(rows.map((t) => `${t.channel}:${t.name}`)).toEqual([
+      'email:Convite formal', 'email:Credencial pronta', 'email:Lembrete', 'whatsapp:Convite WhatsApp', 'whatsapp:Credencial pronta (WhatsApp)',
+    ]);
   });
 
   it('grava, atualiza e elimina; o assunto só fica no email', async () => {
@@ -195,7 +237,7 @@ describe('demo templates', () => {
 
   it('quem só consulta não altera modelos', async () => {
     as('leitura@demo.pt');
-    await expect(templates.list(MAIN)).resolves.toHaveLength(3);
+    await expect(templates.list(MAIN)).resolves.toHaveLength(5);
     await expect(templates.remove(EMAIL_TEMPLATE)).rejects.toMatchObject({ code: 'forbidden' });
   });
 });

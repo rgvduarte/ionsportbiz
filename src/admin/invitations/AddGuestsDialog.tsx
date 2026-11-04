@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Check, FileUp, UserPlus, Users } from 'lucide-react';
-import { api, type Contact, type EventRecord } from '../../lib/api';
+import { api, type Contact, type EventRecord, type InvitationRow } from '../../lib/api';
 import { formalName, fullName } from '../../lib/format';
 import { Alert, Avatar, Badge, Button, Dialog, EmptyState, Field, Input, LoadError, Loader, SearchInput, useToast } from '../../ui';
 import { plural } from './parts';
+import { preApproveProblem, PreApproveField, usePassQuota } from '../passes';
 
 const PAGE_SIZE = 30;
 
-export function AddGuestsDialog({ event, invitedContactIds, waves, onClose, onAdded }: {
+export function AddGuestsDialog({ event, rows, invitedContactIds, waves, onClose, onAdded }: {
   event: EventRecord;
+  /** Convites do evento (para a quota de cada tipo de acesso). */
+  rows: InvitationRow[];
   invitedContactIds: ReadonlySet<string>;
   waves: string[];
   onClose: () => void;
@@ -27,6 +30,8 @@ export function AddGuestsDialog({ event, invitedContactIds, waves, onClose, onAd
   const [wave, setWave] = useState('');
   const [plusOnes, setPlusOnes] = useState(String(event.default_plus_ones));
   const [saving, setSaving] = useState(false);
+  const quota = usePassQuota(event.id, rows);
+  const [passTypeId, setPassTypeId] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -70,15 +75,18 @@ export function AddGuestsDialog({ event, invitedContactIds, waves, onClose, onAd
   const plus = Number(plusOnes);
   const plusValid = plusOnes.trim() !== '' && Number.isInteger(plus) && plus >= 0 && plus <= 10;
 
+  const quotaProblem = preApproveProblem(quota, passTypeId, selected.size);
+  const passName = quota.types?.find((t) => t.id === passTypeId)?.name;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selected.size || !plusValid) return;
+    if (!selected.size || !plusValid || quotaProblem) return;
     setSaving(true);
     try {
       const ids = [...selected.keys()];
-      const created = await api.invitations.create(event.id, ids, { wave: wave.trim() || null, plusOnes: plus });
+      const created = await api.invitations.create(event.id, ids, { wave: wave.trim() || null, plusOnes: plus, passTypeId: passTypeId || null });
       const skipped = ids.length - created;
-      toast.success(`${plural(created, 'convidado adicionado', 'convidados adicionados')} à lista${skipped ? ` (${skipped} já estava${skipped === 1 ? '' : 'm'} convidado${skipped === 1 ? '' : 's'})` : ''}.`);
+      toast.success(`${plural(created, 'convidado adicionado', 'convidados adicionados')} à lista${passName && created ? `, pré-aprovado${created === 1 ? '' : 's'} com ${passName}` : ''}${skipped ? ` (${skipped} já estava${skipped === 1 ? '' : 'm'} convidado${skipped === 1 ? '' : 's'})` : ''}.`);
       onAdded(created);
     } catch (err) {
       toast.error(err);
@@ -136,7 +144,7 @@ export function AddGuestsDialog({ event, invitedContactIds, waves, onClose, onAd
           <Link to="/admin/contactos/importar" className="inv-footer-link"><FileUp size={16} aria-hidden />Importar ficheiro</Link>
           <div className="ui-row">
             <Button onClick={onClose} disabled={saving}>Cancelar</Button>
-            <Button variant="primary" type="submit" form="inv-add-form" icon={<UserPlus />} loading={saving} disabled={!selected.size || !plusValid}>
+            <Button variant="primary" type="submit" form="inv-add-form" icon={<UserPlus />} loading={saving} disabled={!selected.size || !plusValid || !!quotaProblem}>
               {selected.size ? `Adicionar ${plural(selected.size, 'convidado', 'convidados')}` : 'Adicionar'}
             </Button>
           </div>
@@ -179,6 +187,7 @@ export function AddGuestsDialog({ event, invitedContactIds, waves, onClose, onAd
           <Field label="Acompanhantes permitidos" hint={`Por omissão do evento: ${event.default_plus_ones}.`} error={plusValid ? null : 'Indique um número entre 0 e 10.'}>
             <Input type="number" inputMode="numeric" min={0} max={10} step={1} value={plusOnes} onChange={(e) => setPlusOnes(e.target.value)} />
           </Field>
+          <PreApproveField quota={quota} value={passTypeId} onChange={setPassTypeId} needed={selected.size} className="inv-add__pass" />
         </div>
       </form>
     </Dialog>

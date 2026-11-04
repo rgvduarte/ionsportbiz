@@ -17,7 +17,7 @@ import {
   Alert, Avatar, Badge, Button, ButtonAnchor, Checkbox, Drawer, EmptyState, Field, Input, LoadError, Select, Skeleton, Textarea,
   useConfirm, useToast,
 } from '../../ui';
-import { capacityExcess, personalMessage, whatsappBody } from './guestList';
+import { capacityExcess, hasCredential, personalMessage, pickTemplate, whatsappBody } from './guestList';
 import { ChannelIcon, copyText, plural, StatusBadge, When } from './parts';
 import { approvalApplies, isPreApproved } from './approval';
 import { ApproveDialog, RejectDialog } from './ApprovalDialogs';
@@ -214,21 +214,24 @@ function SendSection({ row, event, templates, onSent }: { row: Detail; event: Ev
   const emailTemplates = useMemo(() => (templates ?? []).filter((t) => t.channel === 'email'), [templates]);
   const [templateId, setTemplateId] = useState('');
   const [busy, setBusy] = useState<'email' | 'whatsapp' | 'manual' | null>(null);
-  const template = emailTemplates.find((t) => t.id === templateId) ?? emailTemplates[0];
+  // Já tem a credencial (confirmou e foi aprovado): propõe-se o aviso «Credencial pronta» em vez do convite.
+  const credential = hasCredential(row);
+  const kind = credential ? 'credential' : 'invite';
+  const template = emailTemplates.find((t) => t.id === templateId) ?? pickTemplate(emailTemplates, kind);
   const unpublished = event.status === 'draft' || event.status === 'archived';
   const cancelled = row.status === 'cancelled';
   // Entregue por outra via só faz sentido antes de o convidado responder.
   const canMarkManual = row.status === 'draft' || row.status === 'sent' || row.status === 'opened';
   const resend = row.status !== 'draft';
   const link = inviteUrl(row.token ?? '');
-  const waText = useMemo(() => personalMessage(whatsappBody(templates, event), event, row, link), [templates, event, row, link]);
+  const waText = useMemo(() => personalMessage(whatsappBody(templates, event, kind), event, row, link), [templates, event, kind, row, link]);
 
   const sendEmail = async () => {
     if (!template) return;
     setBusy('email');
     try {
       const r = await api.invitations.sendEmail([row.id], template.id);
-      if (r.sent) toast.success(`Convite enviado para ${row.email}.`);
+      if (r.sent) toast.success(`${credential ? 'Mensagem enviada' : 'Convite enviado'} para ${row.email}.`);
       else toast.error('O email não foi enviado. Verifique o endereço na ficha do contacto.');
       onSent();
     } catch (err) {
@@ -245,7 +248,7 @@ function SendSection({ row, event, templates, onSent }: { row: Detail; event: Ev
     setBusy('whatsapp');
     try {
       await api.invitations.markSent([row.id], 'whatsapp');
-      toast.success('WhatsApp aberto com a mensagem pronta. O convite ficou marcado como enviado por WhatsApp.');
+      toast.success(credential ? 'WhatsApp aberto com a mensagem pronta. O envio ficou no histórico.' : 'WhatsApp aberto com a mensagem pronta. O convite ficou marcado como enviado por WhatsApp.');
       onSent();
     } catch (err) {
       toast.error(err);
@@ -278,7 +281,7 @@ function SendSection({ row, event, templates, onSent }: { row: Detail; event: Ev
   };
 
   return (
-    <Section title="Enviar convite" icon={<Send aria-hidden />}>
+    <Section title={credential ? 'Avisar: credencial pronta' : 'Enviar convite'} icon={<Send aria-hidden />}>
       {(row.sent_at || row.open_count > 0) && (
         <ul className="inv-facts">
           {row.sent_at && (
@@ -326,7 +329,7 @@ function SendSection({ row, event, templates, onSent }: { row: Detail; event: Ev
                   />
                 )}
                 <Button size="sm" icon={<Mail />} loading={busy === 'email'} disabled={!!busy} onClick={() => void sendEmail()}>
-                  {row.sent_at ? 'Reenviar email' : 'Enviar email'}
+                  {credential ? 'Enviar email' : row.sent_at ? 'Reenviar email' : 'Enviar email'}
                 </Button>
               </>
             )}
@@ -342,7 +345,7 @@ function SendSection({ row, event, templates, onSent }: { row: Detail; event: Ev
                   <div className="inv-wa-bubble">{waText}</div>
                 </details>
                 <Button size="sm" icon={<MessageCircle />} loading={busy === 'whatsapp'} disabled={!!busy} onClick={() => void sendWhatsapp()}>
-                  Enviar por WhatsApp
+                  {credential ? 'Avisar por WhatsApp' : 'Enviar por WhatsApp'}
                 </Button>
               </>
             )}

@@ -301,6 +301,11 @@ a.evl-row:focus-visible { box-shadow: var(--focus-ring); border-color: var(--c-a
 .pt-card__label + .pass-accesses { margin-bottom: 12px; }
 .pt-card__count strong { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; color: var(--c-text); }
 .pt-card__pre { font-size: var(--text-xs); color: var(--c-text-3); }
+.pt-quota { display: grid; gap: 6px; margin-top: 8px; }
+.pt-quota__line { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-xs); color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+.pt-quota__line strong { color: var(--c-text); }
+.pt-quota.is-over .pt-quota__line span:last-child { color: var(--c-danger); font-weight: 600; }
+.pt-quota-input { max-width: 180px; }
 .pt-footnote { margin-top: 14px; font-size: var(--text-sm); color: var(--c-text-3); }
 .pt-footnote a { font-weight: 500; }
 

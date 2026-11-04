@@ -14,6 +14,7 @@ export const passTypes: Api['passTypes'] = {
       description: (fields.description ?? '').trim() || null,
       accesses: fields.accesses.map((a) => a.trim()).filter(Boolean),
       color: fields.color || null,
+      capacity: fields.capacity ?? null,
     };
     const res = id
       ? await supabase.from('pass_types').update(row).eq('id', id).select('*').single()

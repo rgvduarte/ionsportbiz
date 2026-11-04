@@ -22,6 +22,8 @@ App e back-office da **ion — International Business & Sports Conference** (PT 
 ```
 
 - **O convidado não cria conta.** O link pessoal (122 bits aleatórios) é a credencial e só dá acesso ao próprio convite, através de funções SQL com permissões controladas.
+- **Aprovação e tipos de acesso:** quem confirma fica «Por aprovar»; a equipa aprova com um tipo de acesso (ex.: VIP Pass, Conference Pass) e só então o convidado vê o QR. Pode pré-aprovar logo ao convidar ou importar («Pré-aprovar como»). Cada tipo pode ter **quota** (máximo de aprovados, pré-aprovados incluídos): a aprovação para quando fica cheia. Depois de aprovar, «Avisar por email» envia o modelo «Credencial pronta».
+- **Instalar no telemóvel:** a app do evento é instalável (PWA). No Android, o botão «Instalar» abre o instalador; no iPhone mostra os passos (Partilhar → Adicionar ao ecrã principal) e o atalho abre diretamente o convite. O service worker (`public/sw.js`) deixa a credencial abrir sem rede.
 - **Papéis da equipa:** Administrador, Editor, Receção (só check-in, não vê o CRM) e Leitura.
 - **RGPD:** consentimento para comunicações futuras separado e opcional, guardado com o texto e a data; exportação dos dados de uma pessoa; apagamento (anonimização) que mantém os números agregados; pedidos de eliminação feitos pelo próprio convidado ficam registados.
 

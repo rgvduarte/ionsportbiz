@@ -1,7 +1,7 @@
 // Lógica da lista de convidados (sem React): filtros, contagens, destinatários de envio,
 // exportação e textos dos modelos sugeridos.
 
-import type { EventRecord, InvitationRow, InvitationStatus, MessageTemplate, MessageTemplateInput } from '../../lib/api';
+import type { EventRecord, Invitation, InvitationRow, InvitationStatus, MessageTemplate, MessageTemplateInput } from '../../lib/api';
 import { formalName, formatDateTime } from '../../lib/format';
 import { APPROVAL_STATUS, INVITATION_STATUS } from '../../lib/status';
 import { toCsv } from '../../lib/csv';
@@ -157,7 +157,28 @@ function opening(event: Pick<EventRecord, 'host_name' | 'invitation_text'>): str
   return 'Temos a honra de convidar V. Exa. para {{evento}}.';
 }
 
-/** Convite formal (email) e convite por WhatsApp, adaptados aos dados do evento. */
+/** Para que serve um modelo: o convite (e lembretes) ou o aviso de credencial pronta, depois da aprovação. */
+export type TemplateKind = 'invite' | 'credential';
+
+/** Os avisos de credencial distinguem-se pelo nome (começa por «Credencial»). */
+export function templateKind(t: Pick<MessageTemplate, 'name'>): TemplateKind {
+  return /^\s*credencial/i.test(t.name) ? 'credential' : 'invite';
+}
+
+/** Modelo a propor: o de `kind` com o canal pedido, senão o primeiro do canal. */
+export function pickTemplate<T extends Pick<MessageTemplate, 'name'>>(templates: T[], kind: TemplateKind): T | undefined {
+  return templates.find((t) => templateKind(t) === kind) ?? templates[0];
+}
+
+/** Já tem a credencial: confirmou e está aprovado (a mensagem certa é o aviso, não o convite). */
+export function hasCredential(r: Pick<Invitation, 'status' | 'approval_status'>): boolean {
+  return r.status === 'accepted' && r.approval_status === 'approved';
+}
+
+/**
+ * Modelos sugeridos, adaptados aos dados do evento: convite formal (email), convite por WhatsApp
+ * e o aviso «Credencial pronta» nos dois canais.
+ */
 export function defaultTemplates(event: Pick<EventRecord, 'host_name' | 'invitation_text' | 'rsvp_deadline'>): DefaultTemplate[] {
   const deadline = event.rsvp_deadline ? ' até {{prazo}}' : '';
   const email = [
@@ -175,15 +196,42 @@ export function defaultTemplates(event: Pick<EventRecord, 'host_name' | 'invitat
     `Pode confirmar a sua presença${deadline} no seu convite pessoal:\n{{link}}`,
     'Com os melhores cumprimentos.',
   ].join('\n\n');
+  const credentialEmail = [
+    '{{tratamento}} {{nome_completo}},',
+    'A sua presença está confirmada para {{evento}}.',
+    'A sua credencial, com o código QR de entrada e os acessos atribuídos, já está disponível no seu convite pessoal:\n{{link}}',
+    'No dia, apresente o código QR à entrada.',
+    event.host_name ? 'Com os melhores cumprimentos,\n{{anfitriao}}' : 'Com os melhores cumprimentos,',
+  ].join('\n\n');
+  const credentialWhatsapp = [
+    '{{tratamento}} {{nome_completo}},',
+    'A sua presença está confirmada para {{evento}}. A sua credencial, com o código QR de entrada, já está disponível:\n{{link}}',
+    'Com os melhores cumprimentos.',
+  ].join('\n\n');
   return [
     { channel: 'email', name: 'Convite formal', subject: 'Convite — {{evento}}', body: email },
     { channel: 'whatsapp', name: 'Convite por WhatsApp', subject: null, body: whatsapp },
+    { channel: 'email', name: 'Credencial pronta', subject: 'A sua credencial — {{evento}}', body: credentialEmail },
+    { channel: 'whatsapp', name: 'Credencial pronta (WhatsApp)', subject: null, body: credentialWhatsapp },
   ];
 }
 
-/** Texto do WhatsApp: o primeiro modelo de WhatsApp do evento, ou o sugerido. */
-export function whatsappBody(templates: MessageTemplate[] | undefined, event: Pick<EventRecord, 'host_name' | 'invitation_text' | 'rsvp_deadline'>): string {
-  return templates?.find((t) => t.channel === 'whatsapp')?.body ?? defaultTemplates(event)[1].body;
+/** Sugeridos que ainda faltam: um convite e um aviso de credencial por canal (pelo tipo, não pelo nome exato). */
+export function missingDefaults(
+  templates: Pick<MessageTemplate, 'channel' | 'name'>[],
+  event: Pick<EventRecord, 'host_name' | 'invitation_text' | 'rsvp_deadline'>,
+): DefaultTemplate[] {
+  return defaultTemplates(event).filter((d) => !templates.some((t) => t.channel === d.channel && templateKind(t) === templateKind(d)));
+}
+
+/** Texto do WhatsApp: o primeiro modelo de WhatsApp do evento para este fim (convite ou credencial), ou o sugerido. */
+export function whatsappBody(
+  templates: MessageTemplate[] | undefined,
+  event: Pick<EventRecord, 'host_name' | 'invitation_text' | 'rsvp_deadline'>,
+  kind: TemplateKind = 'invite',
+): string {
+  const own = templates?.find((t) => t.channel === 'whatsapp' && templateKind(t) === kind);
+  return own?.body ?? defaultTemplates(event).find((d) => d.channel === 'whatsapp' && templateKind(d) === kind)!.body;
 }
 
 /**

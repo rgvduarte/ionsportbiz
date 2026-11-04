@@ -6,6 +6,7 @@ import {
   CAN_EDIT, CAN_READ_CRM, delay, getDb, logActivity, newCheckinCode, newToken, nowIso, requireRole, save, uid,
   withSecrets, type DemoInvitation,
 } from './store';
+import { approveWith, atomically } from './invitations';
 
 // Imita a tabela contacts: o trigger normalize_contact, as restrições (check) e as funções
 // import_contacts, contact_export e anonymize_contact.
@@ -239,69 +240,79 @@ export const contacts: Api['contacts'] & ErasureRequestsApi = {
       if (!Number.isInteger(plusOnes) || plusOnes < 0 || plusOnes > 10) throw new ApiError('validation', 'invitations_plus_ones_allowed_check');
     }
     const wave = opts?.wave?.trim() || null;
+    const passTypeId = opts?.passTypeId ?? null;
+    if (passTypeId && (!eventId || !d.passTypes.some((p) => p.id === passTypeId && p.event_id === eventId))) {
+      throw new ApiError('invalid_pass_type');
+    }
     const result: ImportResult = { inserted: 0, updated: 0, invited: 0, errors: [] };
+    const invitedIds: string[] = [];
 
-    rows.forEach((r, i) => {
-      try {
-        if (!(r.first_name ?? '').trim()) throw new Error('Falta o nome');
-        const email = normalizeEmail(r.email);
-        const phone = r.phone ? r.phone.replace(/[\s().-]/g, '') : null;
-        const alive = d.contacts
-          .filter((c) => c.anonymized_at === null)
-          .sort((a, b) => a.created_at.localeCompare(b.created_at));
-        const existing = email
-          ? alive.find((c) => c.email === email)
-          : phone ? alive.find((c) => c.phone === phone) : undefined;
+    // Tudo ou nada, como import_contacts: se a pré-aprovação falhar (quota), nada fica importado.
+    atomically(() => {
+      rows.forEach((r, i) => {
+        try {
+          if (!(r.first_name ?? '').trim()) throw new Error('Falta o nome');
+          const email = normalizeEmail(r.email);
+          const phone = r.phone ? r.phone.replace(/[\s().-]/g, '') : null;
+          const alive = d.contacts
+            .filter((c) => c.anonymized_at === null)
+            .sort((a, b) => a.created_at.localeCompare(b.created_at));
+          const existing = email
+            ? alive.find((c) => c.email === email)
+            : phone ? alive.find((c) => c.phone === phone) : undefined;
 
-        let contactId: string;
-        if (!existing) {
-          const c = insertContact({
-            salutation: r.salutation ?? null, first_name: r.first_name, last_name: r.last_name ?? null,
-            email: r.email ?? null, phone: r.phone ?? null, organization: r.organization ?? null,
-            job_title: r.job_title ?? null, segment: r.segment ?? null, tags: r.tags ?? [],
-            language: r.language || 'pt', notes: r.notes ?? null,
-          }, 'importação');
-          contactId = c.id;
-          result.inserted++;
-        } else {
-          // Só preenche campos vazios; as etiquetas juntam-se.
-          const next: Contact = {
-            ...existing,
-            salutation: existing.salutation ?? blank(r.salutation),
-            last_name: existing.last_name ?? blank(r.last_name),
-            email: existing.email ?? blank(r.email),
-            phone: existing.phone ?? blank(r.phone),
-            organization: existing.organization ?? blank(r.organization),
-            job_title: existing.job_title ?? blank(r.job_title),
-            segment: existing.segment ?? blank(r.segment),
-            tags: [...existing.tags, ...(r.tags ?? [])],
-            notes: existing.notes ?? blank(r.notes),
-            updated_at: nowIso(),
-          };
-          normalize(next);
-          validate(next);
-          Object.assign(existing, next);
-          contactId = existing.id;
-          result.updated++;
+          let contactId: string;
+          if (!existing) {
+            const c = insertContact({
+              salutation: r.salutation ?? null, first_name: r.first_name, last_name: r.last_name ?? null,
+              email: r.email ?? null, phone: r.phone ?? null, organization: r.organization ?? null,
+              job_title: r.job_title ?? null, segment: r.segment ?? null, tags: r.tags ?? [],
+              language: r.language || 'pt', notes: r.notes ?? null,
+            }, 'importação');
+            contactId = c.id;
+            result.inserted++;
+          } else {
+            // Só preenche campos vazios; as etiquetas juntam-se.
+            const next: Contact = {
+              ...existing,
+              salutation: existing.salutation ?? blank(r.salutation),
+              last_name: existing.last_name ?? blank(r.last_name),
+              email: existing.email ?? blank(r.email),
+              phone: existing.phone ?? blank(r.phone),
+              organization: existing.organization ?? blank(r.organization),
+              job_title: existing.job_title ?? blank(r.job_title),
+              segment: existing.segment ?? blank(r.segment),
+              tags: [...existing.tags, ...(r.tags ?? [])],
+              notes: existing.notes ?? blank(r.notes),
+              updated_at: nowIso(),
+            };
+            normalize(next);
+            validate(next);
+            Object.assign(existing, next);
+            contactId = existing.id;
+            result.updated++;
+          }
+
+          if (eventId && !d.invitations.some((x) => x.event_id === eventId && x.contact_id === contactId)) {
+            const now = nowIso();
+            const inv: DemoInvitation = {
+              id: uid(), event_id: eventId, contact_id: contactId, token: newToken(), checkin_code: newCheckinCode(),
+              status: 'draft', wave, plus_ones_allowed: plusOnes, invited_by: d.currentUserId,
+              sent_at: null, sent_channel: null, first_opened_at: null, last_opened_at: null, open_count: 0,
+              responded_at: null, answers: {}, guest_note: null, checked_in_at: null, checked_in_by: null,
+              approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null,
+              created_at: now, updated_at: now,
+            };
+            d.invitations.push(inv);
+            logActivity({ kind: 'invitation.created', contact_id: contactId, invitation_id: inv.id, event_id: eventId, channel: null, detail: { wave } });
+            invitedIds.push(inv.id);
+            result.invited++;
+          }
+        } catch (err) {
+          result.errors.push({ row: i + 1, message: err instanceof Error ? err.message : String(err) });
         }
-
-        if (eventId && !d.invitations.some((x) => x.event_id === eventId && x.contact_id === contactId)) {
-          const now = nowIso();
-          const inv: DemoInvitation = {
-            id: uid(), event_id: eventId, contact_id: contactId, token: newToken(), checkin_code: newCheckinCode(),
-            status: 'draft', wave, plus_ones_allowed: plusOnes, invited_by: d.currentUserId,
-            sent_at: null, sent_channel: null, first_opened_at: null, last_opened_at: null, open_count: 0,
-            responded_at: null, answers: {}, guest_note: null, checked_in_at: null, checked_in_by: null,
-            approval_status: 'pending', pass_type_id: null, approved_at: null, approved_by: null,
-            created_at: now, updated_at: now,
-          };
-          d.invitations.push(inv);
-          logActivity({ kind: 'invitation.created', contact_id: contactId, invitation_id: inv.id, event_id: eventId, channel: null, detail: { wave } });
-          result.invited++;
-        }
-      } catch (err) {
-        result.errors.push({ row: i + 1, message: err instanceof Error ? err.message : String(err) });
-      }
+      });
+      if (passTypeId && invitedIds.length) approveWith(invitedIds, passTypeId, d.currentUserId);
     });
     save();
     return delay(result, 400);

@@ -13,6 +13,7 @@ import {
   Alert, Badge, Button, ButtonLink, Card, Checkbox, Field, Input, PageHeader, Select, Skeleton, useToast,
 } from '../../ui';
 import { eventOptionLabel, invitableEvents } from './InviteToEventDialog';
+import { preApproveProblem, PreApproveField, usePassQuota } from '../passes';
 import { downloadFile, languageLabel } from './shared';
 import './contacts.css';
 
@@ -55,6 +56,7 @@ export function ContactImportPage() {
   const [eventId, setEventId] = useState('');
   const [wave, setWave] = useState('');
   const [plusOnes, setPlusOnes] = useState('0');
+  const [passTypeId, setPassTypeId] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [result, setResult] = useState<{ data: ImportResult; event: EventRecord | null; lines: number[] } | null>(null);
@@ -106,6 +108,7 @@ export function ContactImportPage() {
     setFileError(null);
     setInvite(false);
     setWave('');
+    setPassTypeId('');
     setResult(null);
     setImportError(null);
   };
@@ -116,7 +119,9 @@ export function ContactImportPage() {
     setImporting(true);
     setImportError(null);
     try {
-      const data = await api.contacts.import(mapped.rows, event ? { eventId: event.id, wave: wave.trim() || undefined, plusOnes: plus } : undefined);
+      const data = await api.contacts.import(mapped.rows, event
+        ? { eventId: event.id, wave: wave.trim() || undefined, plusOnes: plus, passTypeId: passTypeId || null }
+        : undefined);
       setResult({ data, event, lines: mapped.lines });
       setStep('done');
       if (data.errors.length) toast.info(`Importação concluída com ${data.errors.length} ${data.errors.length === 1 ? 'erro' : 'erros'}.`);
@@ -175,6 +180,8 @@ export function ContactImportPage() {
           setWave={setWave}
           plusOnes={plusOnes}
           setPlusOnes={setPlusOnes}
+          passTypeId={passTypeId}
+          setPassTypeId={setPassTypeId}
           importing={importing}
           error={importError}
           onBack={() => setStep('map')}
@@ -486,12 +493,14 @@ function OptionsStep(p: {
   setWave: (v: string) => void;
   plusOnes: string;
   setPlusOnes: (v: string) => void;
+  passTypeId: string;
+  setPassTypeId: (v: string) => void;
   importing: boolean;
   error: string | null;
   onBack: () => void;
   onImport: (event: EventRecord | null) => void;
 }) {
-  const { setEventId, setPlusOnes } = p;
+  const { setEventId, setPlusOnes, setPassTypeId } = p;
   const events = useAsync(() => api.events.list().then((l) => invitableEvents(l)), []);
   const event = events.data?.find((e) => e.id === p.eventId) ?? null;
   const [waves, setWaves] = useState<string[]>([]);
@@ -500,6 +509,10 @@ function OptionsStep(p: {
   useEffect(() => {
     if (!p.eventId && events.data?.length) setEventId(events.data[0].id);
   }, [events.data, p.eventId, setEventId]);
+
+  // Pré-aprovação: os tipos de acesso (e as quotas) do evento escolhido.
+  const quota = usePassQuota(p.invite && event ? event.id : null);
+  useEffect(() => { setPassTypeId(''); }, [p.eventId, setPassTypeId]);
 
   useEffect(() => {
     if (!event) return;
@@ -511,7 +524,9 @@ function OptionsStep(p: {
 
   const plus = Number(p.plusOnes);
   const plusInvalid = p.invite && (!Number.isInteger(plus) || plus < 0 || plus > 10);
-  const blocked = p.invite && (!event || plusInvalid);
+  const quotaProblem = p.invite && event ? preApproveProblem(quota, p.passTypeId, p.valid) : null;
+  const passName = quota.types?.find((t) => t.id === p.passTypeId)?.name;
+  const blocked = p.invite && (!event || plusInvalid || !!quotaProblem);
   const n = formatNumber(p.valid);
 
   return (
@@ -546,6 +561,7 @@ function OptionsStep(p: {
                   hint={event ? `Por omissão do evento: ${event.default_plus_ones}.` : undefined}>
                   <Input type="number" min={0} max={10} step={1} inputMode="numeric" value={p.plusOnes} onChange={(e) => setPlusOnes(e.target.value)} />
                 </Field>
+                <PreApproveField quota={quota} value={p.passTypeId} onChange={setPassTypeId} needed={p.valid} className="span-2" />
               </div>
               {waves.length > 0 && <datalist id={waveListId}>{waves.map((w) => <option key={w} value={w} />)}</datalist>}
               {event?.status === 'closed' && <Alert tone="warning">Este evento está fechado: os convidados veem o convite, mas já não podem responder.</Alert>}
@@ -565,8 +581,9 @@ function OptionsStep(p: {
             <li>Quem já existir é atualizado apenas nos campos vazios.</li>
             {p.invite && event && (
               <li>
-                Cada contacto fica convidado para <strong>{event.name}</strong>{p.wave.trim() ? <> ({p.wave.trim()})</> : null}, no estado «Por enviar».
-                Quem já estiver convidado não é alterado.
+                Cada contacto fica convidado para <strong>{event.name}</strong>{p.wave.trim() ? <> ({p.wave.trim()})</> : null}, no estado «Por enviar»
+                {passName ? <>, pré-aprovado com <strong>{passName}</strong></> : null}. Quem já estiver convidado não é alterado.
+                {passName && ' Se a quota não chegar para todos, nada é importado.'}
               </li>
             )}
           </ul>

@@ -7,7 +7,7 @@ import { useAsync } from '../../lib/useAsync';
 import { formatNumber } from '../../lib/format';
 import { usePermissions } from '../../app/AuthProvider';
 import {
-  ActionMenu, Alert, Button, Card, Dialog, EmptyState, Field, Input, LoadError, Skeleton, Textarea, useConfirm, useToast,
+  ActionMenu, Alert, Button, Card, Dialog, EmptyState, Field, Input, LoadError, Progress, Skeleton, Textarea, useConfirm, useToast,
 } from '../../ui';
 import { AccessList, passColor, PassChip } from '../passes';
 import { approvalListUrl, isPreApproved } from '../invitations/approval';
@@ -15,7 +15,7 @@ import { useEventContext } from './EventLayout';
 import { isHexColor } from './eventForm';
 import {
   accessSuggestions, ACCESS_MAX, DESCRIPTION_MAX, moveItem, NAME_MAX, PASS_COLORS, splitAccesses, SUGGESTED_PASS_TYPES, toPassTypeForm,
-  toPassTypeInput, validatePassType, type PassTypeFormValues,
+  toPassTypeInput, validatePassType, QUOTA_MAX, type PassTypeFormValues,
 } from './passTypes';
 
 const people = (n: number, one: string, many: string) => `${formatNumber(n)} ${n === 1 ? one : many}`;
@@ -249,12 +249,28 @@ function PassCard({ pass: p, usage, canEdit, onEdit, onDelete }: {
             {usage.preApproved > 0 && (
               <span className="pt-card__pre">+ {people(usage.preApproved, 'pré-aprovado', 'pré-aprovados')} ainda sem resposta</span>
             )}
+            {p.capacity != null && <QuotaMeter capacity={p.capacity} used={usage.approved + usage.preApproved} />}
           </>
         ) : (
           <span className="muted">Ordem {p.sort}</span>
         )}
       </footer>
     </article>
+  );
+}
+
+/** Ocupação da quota: aprovados (pré-aprovados incluídos) face ao máximo. */
+function QuotaMeter({ capacity, used }: { capacity: number; used: number }) {
+  const over = used > capacity;
+  const left = capacity - used;
+  return (
+    <div className={['pt-quota', over && 'is-over'].filter(Boolean).join(' ')}>
+      <div className="pt-quota__line">
+        <span>Quota <strong className="tabular">{formatNumber(used)}</strong> / {formatNumber(capacity)}</span>
+        <span>{over ? `${formatNumber(-left)} acima da quota` : left === 0 ? 'Esgotada' : `${formatNumber(left)} ${left === 1 ? 'livre' : 'livres'}`}</span>
+      </div>
+      <Progress value={used / capacity} color={over ? 'var(--c-danger)' : left === 0 ? 'var(--c-warning)' : undefined} />
+    </div>
   );
 }
 
@@ -442,6 +458,16 @@ function PassTypeDialog({ event, pass, others, onClose, onSaved }: {
               <Input type="number" inputMode="numeric" min={0} max={999} step={1} value={values.sort} onChange={(e) => set({ sort: e.target.value })} />
             </Field>
           </div>
+          <Field
+            label="Quota"
+            error={show('capacity')}
+            hint="Opcional. Máximo de convidados aprovados com este acesso (os pré-aprovados contam; os acompanhantes não). A aprovação para quando a quota fica cheia."
+          >
+            <Input
+              type="number" inputMode="numeric" min={1} max={QUOTA_MAX} step={1} placeholder="Sem limite" className="pt-quota-input"
+              value={values.capacity} onChange={(e) => set({ capacity: e.target.value })}
+            />
+          </Field>
         </div>
 
         <aside className="pt-form__preview" aria-label="Pré-visualização">

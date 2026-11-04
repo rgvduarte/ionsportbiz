@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ChevronRight, CircleHelp, ExternalLink, Handshake, Languages, LogOut, Mail, MailCheck, Mic, Newspaper, Pencil, ShieldCheck, Star, Trash2 } from 'lucide-react';
+import { ChevronRight, CircleHelp, Download, ExternalLink, Handshake, Languages, LogOut, Mail, MailCheck, Mic, Newspaper, Pencil, ShieldCheck, Star, Trash2 } from 'lucide-react';
 import { EVENT, PARTNERS } from '../data/event';
 import { INTERESTS, SECTORS } from '../data/people';
 import type { Sector } from '../data/types';
@@ -14,6 +14,7 @@ import { credentialState } from '../lib/invite';
 import { canRespond, safeUrl } from '../lib/rsvp';
 import { useProfile, useStore } from '../lib/store';
 import { asset } from '../lib/asset';
+import { useInstallApp } from '../components/InstallApp';
 
 function Item({ to, href, icon, children, onClick }: { to?: string; href?: string; icon: ReactNode; children: ReactNode; onClick?: () => void }) {
   const inner = (
@@ -105,6 +106,7 @@ export default function More() {
   const view = state.view;
   // Responder (ou mudar a resposta) enquanto o prazo estiver aberto e a entrada não estiver registada.
   const reply = view && canRespond(view) ? (credentialState(view.invitation) === 'unconfirmed' ? t('more.respond') : t('more.change')) : null;
+  const installer = useInstallApp();
   return (
     <>
       <TopBar title={t('more.title')} />
@@ -124,6 +126,13 @@ export default function More() {
             <Item to="/convite" icon={<MailCheck size={20} />}>{reply}</Item>
           </nav>
         )}
+
+        {installer.available && (
+          <nav className="menu">
+            <Item icon={<Download size={20} />} onClick={() => void installer.install()}>{t('install.menu')}</Item>
+          </nav>
+        )}
+        {installer.sheet}
 
         <nav className="menu">
           <Item to="/agenda?mine=1" icon={<Star size={20} />}>{t('more.myAgenda')}</Item>

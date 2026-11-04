@@ -8,7 +8,7 @@ import { usePermissions } from '../../app/AuthProvider';
 import { ActionMenu, Button, Card, EmptyState, LoadError, Skeleton, useConfirm, useToast } from '../../ui';
 import { useEventContext } from '../events/EventLayout';
 import { TEMPLATE_VARIABLES } from '@shared/template';
-import { defaultTemplates } from './guestList';
+import { missingDefaults } from './guestList';
 import { TemplateEditor, type EditorTarget } from './TemplateEditor';
 import { plural } from './parts';
 
@@ -95,8 +95,7 @@ export function TemplatesPage() {
   const createDefaults = async () => {
     setCreating(true);
     try {
-      const existing = new Set(templates.map((t) => t.channel));
-      const missing = defaultTemplates(event).filter((t) => !existing.has(t.channel));
+      const missing = missingDefaults(templates, event);
       for (const t of missing) await api.templates.save({ ...t, event_id: event.id });
       toast.success(missing.length === 1 ? 'Modelo sugerido criado.' : 'Modelos sugeridos criados. Reveja-os antes do primeiro envio.');
       list.reload();
@@ -108,7 +107,7 @@ export function TemplatesPage() {
   };
 
   const groups = GROUPS.filter((g) => g.channel !== 'sms' || templates.some((t) => t.channel === 'sms'));
-  const missingSuggested = defaultTemplates(event).filter((d) => !templates.some((t) => t.channel === d.channel)).length;
+  const missingSuggested = missingDefaults(templates, event).length;
 
   let body: React.ReactNode;
   if (list.error && !list.data) {
@@ -136,7 +135,7 @@ export function TemplatesPage() {
         >
           <span className="inv-measure">
             {can.edit
-              ? 'Comece pelos modelos sugeridos — um convite formal por email e uma mensagem para WhatsApp — já adaptados aos dados deste evento. Pode revê-los e alterá-los antes de enviar.'
+              ? 'Comece pelos modelos sugeridos — o convite (email e WhatsApp) e o aviso «Credencial pronta», para quando a equipa aprova — já adaptados aos dados deste evento. Pode revê-los e alterá-los antes de enviar.'
               : 'A equipa ainda não preparou as mensagens deste evento.'}
           </span>
         </EmptyState>
@@ -203,7 +202,7 @@ export function TemplatesPage() {
         {can.edit && list.data && templates.length > 0 && (
           <div className="inv-head__actions">
             {missingSuggested > 0 && (
-              <Button icon={<Sparkles />} loading={creating} onClick={() => void createDefaults()}>Criar modelo sugerido</Button>
+              <Button icon={<Sparkles />} loading={creating} onClick={() => void createDefaults()}>{missingSuggested === 1 ? 'Criar modelo sugerido' : `Criar ${missingSuggested} modelos sugeridos`}</Button>
             )}
             <Button variant="primary" icon={<Plus />} onClick={() => setEditing({ channel: 'email' })}>Novo modelo</Button>
           </div>

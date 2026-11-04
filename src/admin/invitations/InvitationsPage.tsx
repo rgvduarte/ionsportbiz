@@ -29,7 +29,7 @@ import { InvitationDrawer } from './InvitationDrawer';
 
 const PAGE_SIZE = 50;
 
-type DialogKind = 'add' | 'send' | 'wave' | 'approve' | 'reject' | null;
+type DialogKind = 'add' | 'send' | 'notify' | 'wave' | 'approve' | 'reject' | null;
 
 export function InvitationsPage() {
   const { event } = useEventContext();
@@ -47,6 +47,8 @@ export function InvitationsPage() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [dialog, setDialog] = useState<DialogKind>(null);
+  // Depois de aprovar: quem já confirmou pode ser avisado de que a credencial está pronta.
+  const [notice, setNotice] = useState<{ ids: string[]; pass: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Filtro de aprovação no endereço (?aprovacao=por-aprovar), para o painel poder ligar diretamente.
@@ -176,6 +178,8 @@ export function InvitationsPage() {
 
   const onApproved = (n: number, passName: string) => {
     setDialog(null);
+    const confirmed = selectedRows.filter((r) => r.status === 'accepted').map((r) => r.id);
+    setNotice(n && confirmed.length ? { ids: confirmed, pass: passName } : null);
     if (n) toast.success(`${plural(n, 'convidado aprovado', 'convidados aprovados')} com ${passName}.`);
     else toast.info('Sem alterações: os convites selecionados já tinham este tipo de acesso.');
     finishBulk();
@@ -387,6 +391,19 @@ export function InvitationsPage() {
         </Alert>
       )}
 
+      {notice && can.edit && (
+        <Alert tone="success" className="inv-approval-alert">
+          <span>
+            <strong>{plural(notice.ids.length, 'convidado aprovado já tinha confirmado', 'convidados aprovados já tinham confirmado')}</strong>{' '}
+            ({notice.pass}). A credencial com o código QR já está no convite pessoal: avise-{notice.ids.length === 1 ? 'o' : 'os'}.
+          </span>
+          <span className="ui-row">
+            <Button size="sm" variant="primary" icon={<Send />} onClick={() => setDialog('notify')}>Avisar por email</Button>
+            <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dispensar</Button>
+          </span>
+        </Alert>
+      )}
+
       <Card padded={false} className="inv-card">
         <div className="inv-segments" role="group" aria-label="Filtrar por estado">
           {STATUS_FILTERS.map((f) => (
@@ -478,6 +495,7 @@ export function InvitationsPage() {
       {dialog === 'add' && (
         <AddGuestsDialog
           event={event}
+          rows={rows}
           invitedContactIds={invitedContactIds}
           waves={waves}
           onClose={() => setDialog(null)}
@@ -496,6 +514,19 @@ export function InvitationsPage() {
           onSent={() => { setDialog(null); finishBulk(); }}
         />
       )}
+      {dialog === 'notify' && notice && (
+        <SendDialog
+          event={event}
+          rows={rows}
+          selectedIds={new Set(notice.ids)}
+          templates={templates.data}
+          templatesError={templates.error}
+          blocked={eventClosedForSending}
+          purpose="credential"
+          onClose={() => setDialog(null)}
+          onSent={() => { setDialog(null); setNotice(null); finishBulk(); }}
+        />
+      )}
       {dialog === 'wave' && (
         <WaveDialog
           rows={selectedRows}
@@ -509,7 +540,7 @@ export function InvitationsPage() {
         />
       )}
       {dialog === 'approve' && (
-        <ApproveDialog event={event} rows={selectedRows} onClose={() => setDialog(null)} onDone={(n, pass) => onApproved(n, pass.name)} />
+        <ApproveDialog event={event} rows={selectedRows} allRows={rows} onClose={() => setDialog(null)} onDone={(n, pass) => onApproved(n, pass.name)} />
       )}
       {dialog === 'reject' && (
         <RejectDialog rows={selectedRows} onClose={() => setDialog(null)} onDone={onRejected} />

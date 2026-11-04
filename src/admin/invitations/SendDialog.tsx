@@ -6,12 +6,12 @@ import { inviteUrl } from '../../lib/config';
 import { formalName } from '../../lib/format';
 import { renderTemplate, buildTemplateVars } from '@shared/template';
 import { Alert, Button, Dialog, Field, LoadError, Select, useToast } from '../../ui';
-import { personalMessage, recipients } from './guestList';
+import { personalMessage, pickTemplate, recipients, templateKind, type TemplateKind } from './guestList';
 import { plural } from './parts';
 
 type Scope = 'selection' | 'drafts';
 
-export function SendDialog({ event, rows, selectedIds, templates, templatesError, blocked, onClose, onSent }: {
+export function SendDialog({ event, rows, selectedIds, templates, templatesError, blocked, purpose = 'invite', onClose, onSent }: {
   event: EventRecord;
   rows: InvitationRow[];
   /** null: sem seleção (envia os que estão por enviar). */
@@ -20,16 +20,20 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
   templatesError: unknown;
   /** O evento está em rascunho ou arquivado: os links não abrem. */
   blocked: boolean;
+  /** 'credential': aviso de credencial pronta aos aprovados (propõe o modelo «Credencial pronta»). */
+  purpose?: TemplateKind;
   onClose: () => void;
   onSent: () => void;
 }) {
+  const credential = purpose === 'credential';
   const toast = useToast();
   const emailTemplates = useMemo(() => (templates ?? []).filter((t) => t.channel === 'email'), [templates]);
-  const [scope, setScope] = useState<Scope>(selectedIds ? 'selection' : 'drafts');
+  const [scope, setScope] = useState<Scope>(selectedIds || credential ? 'selection' : 'drafts');
   const [templateId, setTemplateId] = useState('');
   const [sending, setSending] = useState(false);
 
-  const template = emailTemplates.find((t) => t.id === templateId) ?? emailTemplates[0];
+  const template = emailTemplates.find((t) => t.id === templateId) ?? pickTemplate(emailTemplates, purpose);
+  const missingCredentialTemplate = credential && !!templates && !emailTemplates.some((t) => templateKind(t) === 'credential');
   const r = useMemo(() => recipients(rows, scope === 'selection' ? selectedIds : null), [rows, scope, selectedIds]);
   const draftsTotal = useMemo(() => recipients(rows, null).targets.length, [rows]);
   const sample = r.withEmail[0];
@@ -52,8 +56,9 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
     setSending(true);
     try {
       const result = await api.invitations.sendEmail(r.withEmail.map((x) => x.id), template.id);
-      if (result.sent) toast.success(`${plural(result.sent, 'convite enviado', 'convites enviados')} por email.`);
-      if (result.failed) toast.error(`${plural(result.failed, 'convite não foi enviado', 'convites não foram enviados')}. Verifique os endereços de email na ficha de cada convidado.`);
+      const what = credential ? ['aviso enviado', 'avisos enviados'] : ['convite enviado', 'convites enviados'];
+      if (result.sent) toast.success(`${plural(result.sent, what[0], what[1])} por email.`);
+      if (result.failed) toast.error(`${plural(result.failed, credential ? 'aviso não foi enviado' : 'convite não foi enviado', credential ? 'avisos não foram enviados' : 'convites não foram enviados')}. Verifique os endereços de email na ficha de cada convidado.`);
       if (!result.sent && !result.failed) toast.info('Nenhum convite foi enviado.');
       onSent();
     } catch (err) {
@@ -69,8 +74,10 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
       open
       onClose={sending ? () => undefined : onClose}
       size="lg"
-      title="Enviar convites por email"
-      description="Cada convidado recebe um email com o seu link pessoal. O envio fica registado no histórico de cada convite."
+      title={credential ? 'Avisar: credencial pronta' : 'Enviar convites por email'}
+      description={credential
+        ? 'Cada convidado aprovado recebe um email com o link pessoal, onde já está a credencial com o código QR. O envio fica no histórico.'
+        : 'Cada convidado recebe um email com o seu link pessoal. O envio fica registado no histórico de cada convite.'}
       footer={
         <>
           <Button onClick={onClose} disabled={sending}>Cancelar</Button>
@@ -93,7 +100,7 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
           <Alert tone="warning">O evento está fechado: os convidados veem o convite, mas já não podem responder.</Alert>
         )}
 
-        {selectedIds && (
+        {selectedIds && !credential && (
           <fieldset className="inv-send__scope">
             <legend className="visually-hidden">Destinatários</legend>
             <label className={['inv-radio-card', scope === 'selection' && 'is-active'].filter(Boolean).join(' ')}>
@@ -122,6 +129,13 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
             {' '}— pode partir do modelo «Convite formal» sugerido.
           </Alert>
         ) : (
+          <>
+          {missingCredentialTemplate && (
+            <Alert tone="warning">
+              Falta o modelo «Credencial pronta». Crie-o em <Link to={mensagensUrl} className="inv-alert-link">Mensagens</Link> com
+              «Criar modelos sugeridos», ou escolha outro modelo abaixo.
+            </Alert>
+          )}
           <Field label="Modelo de email" hint={<>Os modelos editam-se no separador <Link to={mensagensUrl}>Mensagens</Link>.</>}>
             <Select
               value={template?.id ?? ''}
@@ -129,12 +143,13 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
               options={emailTemplates.map((t) => ({ value: t.id, label: t.name }))}
             />
           </Field>
+          </>
         )}
 
         <div className="inv-send__figures" aria-live="polite">
-          <Figure icon={<Mail />} value={r.withEmail.length} label={r.withEmail.length === 1 ? 'recebe o convite por email' : 'recebem o convite por email'} tone="accent" />
+          <Figure icon={<Mail />} value={r.withEmail.length} label={credential ? (r.withEmail.length === 1 ? 'recebe o aviso por email' : 'recebem o aviso por email') : r.withEmail.length === 1 ? 'recebe o convite por email' : 'recebem o convite por email'} tone="accent" />
           <Figure icon={<MailX />} value={r.withoutEmail.length} label="sem email registado" tone={r.withoutEmail.length ? 'warning' : 'neutral'} />
-          <Figure icon={<RefreshCw />} value={r.resend} label={r.resend === 1 ? 'já tinha recebido (reenvio)' : 'já tinham recebido (reenvio)'} tone="neutral" />
+          {!credential && <Figure icon={<RefreshCw />} value={r.resend} label={r.resend === 1 ? 'já tinha recebido (reenvio)' : 'já tinham recebido (reenvio)'} tone="neutral" />}
         </div>
 
         {r.targets.length === 0 && (
@@ -150,7 +165,9 @@ export function SendDialog({ event, rows, selectedIds, templates, templatesError
               <strong>{plural(r.withoutEmail.length, 'convidado sem email', 'convidados sem email')}</strong>
               <p>
                 {r.withoutEmail.slice(0, 4).map((x) => formalName(x)).join(', ')}{r.withoutEmail.length > 4 ? ` e mais ${r.withoutEmail.length - 4}` : ''}.
-                {' '}Envie-lhes o convite por WhatsApp, a partir da ficha de cada um, ou entregue-o em mão e marque-o como enviado.
+                {credential
+                  ? ' Avise-os por WhatsApp, a partir da ficha de cada um (a mensagem «Credencial pronta» já vem escrita).'
+                  : ' Envie-lhes o convite por WhatsApp, a partir da ficha de cada um, ou entregue-o em mão e marque-o como enviado.'}
               </p>
             </div>
           </div>

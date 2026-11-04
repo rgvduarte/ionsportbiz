@@ -83,6 +83,8 @@ export interface PassType {
   /** #rrggbb */
   color: string | null;
   sort: number;
+  /** Máximo de convites aprovados com este tipo (pré-aprovados incluídos, acompanhantes não). null = sem limite. */
+  capacity: number | null;
   created_at: string;
 }
 
@@ -389,7 +391,8 @@ export interface Api {
     exportData(id: string): Promise<unknown>;
     segments(): Promise<string[]>;
     tags(): Promise<string[]>;
-    import(rows: ImportRow[], opts?: { eventId?: string; wave?: string; plusOnes?: number }): Promise<ImportResult>;
+    /** Com eventId cria também os convites; com passTypeId pré-aprova-os (tudo ou nada: se a quota não chegar, nada é importado). */
+    import(rows: ImportRow[], opts?: { eventId?: string; wave?: string; plusOnes?: number; passTypeId?: string | null }): Promise<ImportResult>;
     activities(contactId: string): Promise<Activity[]>;
     addNote(contactId: string, text: string): Promise<void>;
     invitations(contactId: string): Promise<(Invitation & { event: Pick<EventRecord, 'id' | 'name' | 'starts_at' | 'status'> })[]>;
@@ -398,8 +401,11 @@ export interface Api {
   invitations: {
     list(eventId: string, q?: InvitationQuery): Promise<InvitationRow[]>;
     get(id: string): Promise<InvitationRow & { companions: Companion[] }>;
-    /** Convida contactos existentes; ignora quem já está convidado. Devolve quantos convites novos. */
-    create(eventId: string, contactIds: string[], opts?: { wave?: string | null; plusOnes?: number }): Promise<number>;
+    /**
+     * Convida contactos existentes; ignora quem já está convidado. Devolve quantos convites novos.
+     * Com passTypeId, pré-aprova os novos com esse tipo de acesso (tudo ou nada: se a quota não chegar, nenhum é criado).
+     */
+    create(eventId: string, contactIds: string[], opts?: { wave?: string | null; plusOnes?: number; passTypeId?: string | null }): Promise<number>;
     update(id: string, patch: Partial<Pick<Invitation, 'wave' | 'plus_ones_allowed' | 'status' | 'answers' | 'guest_note'>>): Promise<void>;
     remove(id: string): Promise<void>;
     markSent(ids: string[], channel: Channel): Promise<number>;

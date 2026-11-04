@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | 'not_accepted'
   | 'not_approved'
   | 'invalid_pass_type'
+  | 'pass_quota'
   | 'last_admin'
   | 'duplicate'
   | 'validation'
@@ -34,6 +35,7 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   not_accepted: 'Este convidado não confirmou presença.',
   not_approved: 'Presença ainda não aprovada pela equipa.',
   invalid_pass_type: 'O tipo de acesso não pertence a este evento.',
+  pass_quota: 'A quota deste tipo de acesso não chega para todos os convites.',
   last_admin: 'Tem de existir pelo menos um administrador ativo.',
   duplicate: 'Já existe um registo igual.',
   validation: 'Verifique os dados introduzidos.',

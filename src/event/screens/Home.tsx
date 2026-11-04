@@ -11,6 +11,7 @@ import { pendingCount, useStore } from '../lib/store';
 import { useCountdown } from '../lib/useCountdown';
 import { asset } from '../lib/asset';
 import { FlapDigit } from '../components/SplitFlap';
+import { InstallCard } from '../components/InstallApp';
 
 /** Contagem decrescente em painel de partidas: cada algarismo é uma placa (ver SplitFlap). */
 function Countdown() {
@@ -64,6 +65,7 @@ export default function Home() {
         {/* O convite primeiro: responder, aguardar a aprovação ou a credencial. */}
         <div className="pad-x home-invite">
           <InviteCard />
+          <InstallCard />
         </div>
 
         <section className="hero">

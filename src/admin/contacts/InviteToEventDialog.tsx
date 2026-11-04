@@ -4,6 +4,7 @@ import { formatDate, formatNumber } from '../../lib/format';
 import { EVENT_STATUS } from '../../lib/status';
 import { useAsync } from '../../lib/useAsync';
 import { Alert, Button, Dialog, Field, Input, Select, Skeleton, useToast } from '../../ui';
+import { preApproveProblem, PreApproveField, usePassQuota } from '../passes';
 
 interface Props {
   open: boolean;
@@ -41,8 +42,11 @@ function InviteForm({ onClose, contactIds, onDone }: Props) {
   const [waves, setWaves] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passTypeId, setPassTypeId] = useState('');
 
   const event = useMemo(() => events.data?.find((e) => e.id === eventId) ?? null, [events.data, eventId]);
+  const quota = usePassQuota(event?.id ?? null);
+  useEffect(() => { setPassTypeId(''); }, [eventId]);
 
   // Escolhe o primeiro evento da lista por omissão.
   useEffect(() => {
@@ -61,14 +65,15 @@ function InviteForm({ onClose, contactIds, onDone }: Props) {
   const count = contactIds.length;
   const plus = Number(plusOnes);
   const plusInvalid = !Number.isInteger(plus) || plus < 0 || plus > 10;
+  const quotaProblem = preApproveProblem(quota, passTypeId, count);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!event || plusInvalid) return;
+    if (!event || plusInvalid || quotaProblem) return;
     setSaving(true);
     setError(null);
     try {
-      const created = await api.invitations.create(event.id, contactIds, { wave: wave.trim() || null, plusOnes: plus });
+      const created = await api.invitations.create(event.id, contactIds, { wave: wave.trim() || null, plusOnes: plus, passTypeId: passTypeId || null });
       const skipped = count - created;
       if (created === 0) {
         toast.info(count === 1 ? `Este contacto já estava convidado para ${event.name}.` : `Os ${formatNumber(count)} contactos já estavam convidados para ${event.name}.`);
@@ -98,7 +103,7 @@ function InviteForm({ onClose, contactIds, onDone }: Props) {
       footer={
         <>
           <Button onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button type="submit" form={formId} variant="primary" loading={saving} disabled={!event || plusInvalid}>
+          <Button type="submit" form={formId} variant="primary" loading={saving} disabled={!event || plusInvalid || !!quotaProblem}>
             {count === 1 ? 'Criar convite' : 'Criar convites'}
           </Button>
         </>
@@ -137,6 +142,7 @@ function InviteForm({ onClose, contactIds, onDone }: Props) {
                 hint={event ? `Por omissão do evento: ${event.default_plus_ones}.` : undefined}>
                 <Input type="number" min={0} max={10} step={1} inputMode="numeric" value={plusOnes} onChange={(e) => setPlusOnes(e.target.value)} />
               </Field>
+              <PreApproveField quota={quota} value={passTypeId} onChange={setPassTypeId} needed={count} className="span-2" />
             </div>
             {waves.length > 0 && (
               <datalist id={waveListId}>

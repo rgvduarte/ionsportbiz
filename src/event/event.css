@@ -624,6 +624,30 @@
 @media (min-width: 600px) {
   .ev .app { border-left: 1px solid #111; border-right: 1px solid #111; }
 }
+/* ---------- instalar a app ---------- */
+.ev .install-card {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  margin-top: 12px; padding: 14px 40px 14px 14px; border-radius: var(--radius); background: #0d0d0d; border: 1px solid #222;
+}
+.ev .install-icon { width: 48px; height: 48px; border-radius: 12px; }
+.ev .install-text { display: grid; gap: 2px; min-width: 0; }
+.ev .install-text strong { font-size: 0.98rem; font-weight: 800; }
+.ev .install-text span { font-size: 0.82rem; color: var(--muted); }
+.ev .install-close { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); }
+.ev .install-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, 0.66); animation: ev-screen-in 0.2s ease;
+}
+.ev .install-sheet {
+  width: 100%; max-width: var(--max); display: grid; gap: 16px;
+  padding: 22px 20px calc(var(--safe-bottom) + 20px); border-radius: 24px 24px 0 0; background: #111; border-top: 1px solid #262626;
+  animation: ev-rise 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ev .install-sheet h2 { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+.ev .install-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: step; }
+.ev .install-steps li { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 12px; font-size: 0.95rem; line-height: 1.35; }
+.ev .install-step-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: #1c1c1c; color: var(--lime); }
+
 /* ---------- movimento ---------- */
 /* Cada ecrã entra num esbatimento curto (só opacidade: não cria contentor para os elementos fixos). */
 .ev .screen-in { animation: ev-screen-in 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -636,7 +660,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ev, .ev * { transition: none !important; }
-  .ev .pass-foil::before, .ev .pass-live-dot, .ev .pass.pass-vip, .ev .screen-in, .ev .icard, .ev .cred-steps .step-dot svg { animation: none; }
+  .ev .pass-foil::before, .ev .pass-live-dot, .ev .pass.pass-vip, .ev .screen-in, .ev .icard, .ev .cred-steps .step-dot svg,
+  .ev .install-sheet, .ev .install-sheet-backdrop { animation: none; }
   .ev .flap-fall { display: none; }
   .ev .flap-land { animation: none; transform: none; }
 }

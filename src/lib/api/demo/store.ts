@@ -28,7 +28,7 @@ export interface DemoDb {
 }
 
 // Muda quando os dados fictícios mudam, para a demonstração recomeçar com os novos.
-const KEY = 'convites-demo-v5';
+const KEY = 'convites-demo-v6';
 
 // ───────── Utilitários ─────────
 
@@ -388,13 +388,13 @@ function seed(): DemoDb {
     id: '00000000-0000-4000-8000-0000000009a1', event_id: events[0].id, name: 'VIP Pass',
     description: 'Acesso a todo o programa, incluindo o jantar de gala e o almoço VIP.',
     accesses: ['VIP Gala Dinner', 'Cerimónia dos ion Awards', 'ion Conference (5 palcos)', 'VIP Lunch'],
-    color: '#ccff00', sort: 0, created_at: created,
+    color: '#ccff00', sort: 0, capacity: 20, created_at: created,
   };
   const conference: PassType = {
     id: '00000000-0000-4000-8000-0000000009a2', event_id: events[0].id, name: 'Conference Pass',
     description: 'Acesso à ion Conference de 23 de março.',
     accesses: ['ion Conference (5 palcos)', 'Zona de networking'],
-    color: '#e27a2c', sort: 1, created_at: created,
+    color: '#e27a2c', sort: 1, capacity: null, created_at: created,
   };
   d.passTypes = [vip, conference];
 
@@ -534,6 +534,29 @@ function seed(): DemoDb {
         '{{data}}\n{{local}}',
         'Agradecemos que confirme a sua presença até {{prazo}}, através do seu convite pessoal:\n{{link}}',
         'Com os melhores cumprimentos,\n{{anfitriao}}',
+      ),
+      created_at: created, updated_at: created,
+    },
+    // Aviso depois da aprovação (os mesmos textos que o módulo de mensagens sugere).
+    {
+      id: '00000000-0000-4000-8000-0000000007a4', event_id: events[0].id, channel: 'email', name: 'Credencial pronta',
+      subject: 'A sua credencial — {{evento}}',
+      body: paragraphs(
+        '{{tratamento}} {{nome_completo}},',
+        'A sua presença está confirmada para {{evento}}.',
+        'A sua credencial, com o código QR de entrada e os acessos atribuídos, já está disponível no seu convite pessoal:\n{{link}}',
+        'No dia, apresente o código QR à entrada.',
+        'Com os melhores cumprimentos,\n{{anfitriao}}',
+      ),
+      created_at: created, updated_at: created,
+    },
+    {
+      id: '00000000-0000-4000-8000-0000000007a5', event_id: events[0].id, channel: 'whatsapp', name: 'Credencial pronta (WhatsApp)',
+      subject: null,
+      body: paragraphs(
+        '{{tratamento}} {{nome_completo}},',
+        'A sua presença está confirmada para {{evento}}. A sua credencial, com o código QR de entrada, já está disponível:\n{{link}}',
+        'Com os melhores cumprimentos.',
       ),
       created_at: created, updated_at: created,
     },
